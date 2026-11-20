@@ -1,0 +1,31 @@
+# Focused subset of Milvus's golangci-lint v2 configuration.
+version: "2"
+linters:
+  default: none
+  enable:
+    - govet
+    - ineffassign
+    - staticcheck
+    - revive
+  settings:
+    revive:
+      enable-default-rules: false
+      rules:
+        - name: var-naming
+          arguments:
+            - - ID
+              - IDS
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports
+  settings:
+    gofumpt:
+      module-path: github.com/lie-yan/predicate-optimization
+    goimports:
+      local-prefixes:
+        - github.com/lie-yan/predicate-optimization
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

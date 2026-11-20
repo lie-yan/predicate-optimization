@@ -99,6 +99,42 @@ func TestSpecialFormExpressionNullableCandidates(t *testing.T) {
 	}
 }
 
+func TestSpecialFormExpressionCompositeTypes(t *testing.T) {
+	integer := fixture(types.NewIntType(types.Int64, foundation.NonNull))
+	array := fixture(types.NewArrayType(integer, foundation.NonNull))
+	nested := fixture(types.NewArrayType(array, foundation.NonNull))
+	structure := fixture(types.NewStructType([]types.StructField{{Name: "items", Type: array}}, foundation.NonNull))
+	reference := func(typ types.Type) expressions.Expression {
+		return fixture(expressions.NewReferenceExpression(fixture(columns.NewColumnID("table", "value")), typ, "value"))
+	}
+	for _, typ := range []types.Type{array, nested, structure} {
+		t.Run(typ.String(), func(t *testing.T) {
+			for _, targetNullability := range []foundation.Nullability{foundation.NonNull, foundation.MayNull} {
+				for _, candidateNullability := range []foundation.Nullability{foundation.NonNull, foundation.MayNull} {
+					target := reference(fixture(typ.WithNullability(targetNullability)))
+					candidate := reference(fixture(typ.WithNullability(candidateNullability)))
+					nullability := targetNullability
+					if candidateNullability == foundation.MayNull {
+						nullability = foundation.MayNull
+					}
+					result := fixture(types.NewBoolType(nullability))
+					node := fixture(expressions.NewSpecialFormExpression(foundation.SpecialFormIn, result, []expressions.Expression{target, candidate}))
+					if node.ChildAt(0) != target || node.ChildAt(1) != candidate || !node.Type().EqualsTo(result) {
+						t.Fatal("composite arguments or result type changed")
+					}
+				}
+			}
+		})
+	}
+	boolean := fixture(types.NewBoolType(foundation.NonNull))
+	nullableElement := fixture(types.NewArrayType(fixture(integer.WithNullability(foundation.MayNull)), foundation.NonNull))
+	for _, candidate := range []types.Type{integer, nested, structure, nullableElement} {
+		if node, err := expressions.NewSpecialFormExpression(foundation.SpecialFormIn, boolean, []expressions.Expression{reference(array), reference(candidate)}); node != nil || err == nil {
+			t.Errorf("nonuniform candidate %s accepted for %s", candidate, array)
+		}
+	}
+}
+
 func TestSpecialFormExpressionInvalidAndNil(t *testing.T) {
 	boolean := fixture(types.NewBoolType(foundation.NonNull))
 	yes := logicalLiteral(foundation.NonNull, true)

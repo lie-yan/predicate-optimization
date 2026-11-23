@@ -11,7 +11,7 @@ import (
 
 // SpecialFormExpression stores a form, explicit result Type and ordered
 // expression arguments. Form-specific contracts govern argument roles.
-// Construction supports primitive scalar IN.
+// IN supports uniform argument types, including composite types.
 // Use NewSpecialFormExpression; zero is invalid.
 type SpecialFormExpression struct {
 	form      foundation.SpecialForm
@@ -50,11 +50,6 @@ func validateInArguments(resultType types.Type, arguments []Expression) error {
 		return fmt.Errorf("IN requires a target expression")
 	}
 	target := arguments[0].Type()
-	switch target.(type) {
-	case *types.BoolType, *types.IntType, *types.FloatType, *types.VarCharType:
-	default:
-		return fmt.Errorf("IN target must be Bool, integer, float or VARCHAR")
-	}
 	nullability := target.Nullability()
 	for i, argument := range arguments[1:] {
 		adapted, err := argument.Type().WithNullability(target.Nullability())

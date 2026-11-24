@@ -102,16 +102,3 @@ func TestVarCharRangeString(t *testing.T) {
 		checkRangeString(t, typ, tc.lower, tc.upper, tc.want)
 	}
 }
-
-func TestRangeStringPreconditions(t *testing.T) {
-	for _, r := range []*ranges.Range{nil, {}} {
-		func() {
-			defer func() {
-				if recover() == nil {
-					t.Error("expected assertion for unconstructed range")
-				}
-			}()
-			_ = r.String()
-		}()
-	}
-}

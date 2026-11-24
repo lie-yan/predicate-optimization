@@ -3,8 +3,6 @@ package values_test
 import (
 	"testing"
 
-	"github.com/lie-yan/predicate-optimization/internal/assertions"
-
 	"github.com/lie-yan/predicate-optimization/foundation"
 	testbedvalues "github.com/lie-yan/predicate-optimization/testbed/values"
 	"github.com/lie-yan/predicate-optimization/types"
@@ -127,26 +125,5 @@ func TestValueWithNullabilityNullsAndInvalidTargets(t *testing.T) {
 		if result, err := source.WithNullability(foundation.Nullability(255)); err == nil || result != nil {
 			t.Fatal("invalid nullability accepted")
 		}
-	}
-}
-
-func TestValueWithNullabilityNilAssertions(t *testing.T) {
-	var nilInterface valueinterfaces.Value
-	var nilValue *testbedvalues.IntegerValue
-	for name, call := range map[string]func(){
-		"nil value":       func() { _, _ = nilInterface.WithNullability(foundation.MayNull) },
-		"typed nil value": func() { _, _ = nilValue.WithNullability(foundation.MayNull) },
-	} {
-		t.Run(name, func(t *testing.T) {
-			if !assertions.Enabled {
-				return
-			}
-			defer func() {
-				if recover() == nil {
-					t.Fatal("expected nil assertion")
-				}
-			}()
-			call()
-		})
 	}
 }

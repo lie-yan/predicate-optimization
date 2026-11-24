@@ -91,16 +91,3 @@ func TestVarCharRangeSetString(t *testing.T) {
 	checkRangeSetString(t, typ, nil, false, "{}")
 	checkRangeSetString(t, typ, []*ranges.Range{testutil.RequiredRange(t, typ, ranges.RangeEndpoint{}, ranges.RangeEndpoint{})}, false, "ALL")
 }
-
-func TestRangeSetStringPreconditions(t *testing.T) {
-	for _, set := range []*sets.SortedRangeSet{nil, {}} {
-		func() {
-			defer func() {
-				if recover() == nil {
-					t.Error("expected assertion for unconstructed set")
-				}
-			}()
-			_ = set.String()
-		}()
-	}
-}

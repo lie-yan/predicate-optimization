@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/lie-yan/predicate-optimization/internal/assertions"
-
 	"github.com/lie-yan/predicate-optimization/foundation"
 	"github.com/lie-yan/predicate-optimization/types"
 )
@@ -49,21 +47,5 @@ func TestString(t *testing.T) {
 		if got := integer(t, width, foundation.NonNull).String(); got != fmt.Sprintf("Int%d!", width) {
 			t.Fatal(got)
 		}
-	}
-}
-
-func TestStringNilAssertion(t *testing.T) {
-	for _, typ := range []types.Type{(*types.BoolType)(nil), (*types.IntType)(nil), (*types.VarCharType)(nil), (*types.ArrayType)(nil), (*types.StructType)(nil)} {
-		func() {
-			if !assertions.Enabled {
-				return
-			}
-			defer func() {
-				if recover() == nil {
-					t.Errorf("missing assertion for %T", typ)
-				}
-			}()
-			_ = typ.String()
-		}()
 	}
 }

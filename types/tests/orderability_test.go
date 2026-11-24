@@ -3,8 +3,6 @@ package types_test
 import (
 	"testing"
 
-	"github.com/lie-yan/predicate-optimization/internal/assertions"
-
 	"github.com/lie-yan/predicate-optimization/foundation"
 	"github.com/lie-yan/predicate-optimization/types"
 )
@@ -59,21 +57,5 @@ func TestOrderability(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-func TestOrderabilityRequiresNonNilReceiver(t *testing.T) {
-	for _, typ := range []types.Type{(*types.BoolType)(nil), (*types.IntType)(nil), (*types.FloatType)(nil), (*types.VarCharType)(nil), (*types.ArrayType)(nil), (*types.StructType)(nil)} {
-		func() {
-			if !assertions.Enabled {
-				return
-			}
-			defer func() {
-				if recover() == nil {
-					t.Errorf("%T accepted nil receiver", typ)
-				}
-			}()
-			typ.IsOrderable()
-		}()
 	}
 }

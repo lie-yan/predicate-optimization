@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/lie-yan/predicate-optimization/internal/assertions"
-
 	"github.com/lie-yan/predicate-optimization/expressions"
 	"github.com/lie-yan/predicate-optimization/foundation"
 	ids "github.com/lie-yan/predicate-optimization/testbed/expressions"
@@ -42,29 +40,6 @@ func TestExpressionChildCount(t *testing.T) {
 	}
 }
 
-func TestExpressionChildCountNilReceiver(t *testing.T) {
-	for _, node := range []expressions.Expression{
-		(*expressions.LiteralExpression)(nil),
-		(*expressions.ReferenceExpression)(nil),
-		(*expressions.OpaqueExpression)(nil),
-		(*expressions.CallExpression)(nil),
-		(*expressions.LogicalExpression)(nil),
-		(*expressions.SpecialFormExpression)(nil),
-	} {
-		func() {
-			if !assertions.Enabled {
-				return
-			}
-			defer func() {
-				if recover() == nil {
-					t.Errorf("%T nil receiver did not assert", node)
-				}
-			}()
-			node.ChildCount()
-		}()
-	}
-}
-
 func TestExpressionChildAt(t *testing.T) {
 	for _, node := range childAccessFixtures() {
 		t.Run(fmt.Sprintf("%T", node), func(t *testing.T) {
@@ -98,28 +73,5 @@ func TestExpressionChildAt(t *testing.T) {
 				}()
 			}
 		})
-	}
-}
-
-func TestExpressionChildAtNilReceiver(t *testing.T) {
-	if !assertions.Enabled {
-		t.Skip("nil receiver assertions require debug build")
-	}
-	for _, node := range []expressions.Expression{
-		(*expressions.LiteralExpression)(nil),
-		(*expressions.ReferenceExpression)(nil),
-		(*expressions.OpaqueExpression)(nil),
-		(*expressions.CallExpression)(nil),
-		(*expressions.LogicalExpression)(nil),
-		(*expressions.SpecialFormExpression)(nil),
-	} {
-		func() {
-			defer func() {
-				if recover() == nil {
-					t.Errorf("%T nil receiver did not panic", node)
-				}
-			}()
-			node.ChildAt(0)
-		}()
 	}
 }

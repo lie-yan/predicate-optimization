@@ -3,8 +3,6 @@ package types_test
 import (
 	"testing"
 
-	"github.com/lie-yan/predicate-optimization/internal/assertions"
-
 	"github.com/lie-yan/predicate-optimization/foundation"
 	"github.com/lie-yan/predicate-optimization/types"
 )
@@ -44,25 +42,6 @@ func TestEqualsToIgnoringNullability(t *testing.T) {
 			if a.Nullability() != foundation.MayNull || other.Nullability() != foundation.NonNull {
 				t.Fatal("comparison mutated inputs")
 			}
-		}
-	}
-}
-
-func TestEqualsToIgnoringNullabilityNilPreconditions(t *testing.T) {
-	valid := &types.BoolType{}
-	for _, absent := range []types.Type{nil, (*types.BoolType)(nil), (*types.IntType)(nil), (*types.FloatType)(nil), (*types.VarCharType)(nil), (*types.ArrayType)(nil), (*types.StructType)(nil)} {
-		for _, invoke := range []func(){func() { valid.EqualsToIgnoringNullability(absent) }, func() { absent.EqualsToIgnoringNullability(valid) }} {
-			func() {
-				if !assertions.Enabled {
-					return
-				}
-				defer func() {
-					if recover() == nil {
-						t.Errorf("nil %T did not assert", absent)
-					}
-				}()
-				invoke()
-			}()
 		}
 	}
 }

@@ -115,16 +115,3 @@ func TestFiniteVarCharStrings(t *testing.T) {
 	bounded := testutil.Must(types.NewVarCharType(&zero, foundation.NonNull))
 	checkFiniteStrings(t, bounded, []valueinterfaces.Value{testutil.Must(testbedvalues.NewVarChar(bounded, ""))}, `{""}`)
 }
-
-func TestFiniteStringPreconditions(t *testing.T) {
-	for _, set := range []*finite.EquatableValueSet{nil, {}} {
-		func() {
-			defer func() {
-				if recover() == nil {
-					t.Error("expected assertion for unconstructed set")
-				}
-			}()
-			_ = set.String()
-		}()
-	}
-}

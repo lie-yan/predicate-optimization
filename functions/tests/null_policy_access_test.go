@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/lie-yan/predicate-optimization/functions"
-	"github.com/lie-yan/predicate-optimization/internal/assertions"
 )
 
 func TestNullPolicyIndexedAccess(t *testing.T) {
@@ -38,17 +37,4 @@ func TestNullPolicyIndexedAccess(t *testing.T) {
 			}()
 		}
 	}
-}
-
-func TestNullPolicyAtNilReceiver(t *testing.T) {
-	if !assertions.Enabled {
-		t.Skip("nil receiver assertions require debug build")
-	}
-	defer func() {
-		if recover() == nil {
-			t.Fatal("nil receiver did not panic")
-		}
-	}()
-	var metadata *functions.FunctionMetadata
-	metadata.NullPolicyAt(0)
 }

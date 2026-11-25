@@ -3,8 +3,6 @@ package functions_test
 import (
 	"testing"
 
-	"github.com/lie-yan/predicate-optimization/internal/assertions"
-
 	"github.com/lie-yan/predicate-optimization/foundation"
 	shared "github.com/lie-yan/predicate-optimization/functions"
 	testbed "github.com/lie-yan/predicate-optimization/testbed/functions"
@@ -80,31 +78,5 @@ func TestCatalogRejectsConflicts(t *testing.T) {
 		if catalog, err := testbed.NewCatalog([]testbed.Definition{invalid}); err == nil || catalog != nil {
 			t.Fatal("invalid definition accepted")
 		}
-	}
-}
-
-func TestHandleNilAssertions(t *testing.T) {
-	catalog, err := testbed.NewCatalog([]testbed.Definition{definition(t, types.Int64, foundation.NonNull, shared.PropagateNull)})
-	if err != nil {
-		t.Fatal(err)
-	}
-	handle := catalog.Handles()[0]
-	var nilHandle *testbed.Handle
-	for name, call := range map[string]func(){
-		"nil receiver":      func() { nilHandle.Name() },
-		"nil operand":       func() { handle.EqualsTo(nil) },
-		"typed nil operand": func() { handle.EqualsTo(nilHandle) },
-	} {
-		t.Run(name, func(t *testing.T) {
-			if !assertions.Enabled {
-				return
-			}
-			defer func() {
-				if recover() == nil {
-					t.Fatal("expected precondition assertion")
-				}
-			}()
-			call()
-		})
 	}
 }

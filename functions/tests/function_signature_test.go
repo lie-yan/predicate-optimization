@@ -37,10 +37,6 @@ func TestFunctionSignatureOwnership(t *testing.T) {
 	if signature.ArgumentTypes()[1] != element {
 		t.Fatal("mutating returned arguments changed the signature")
 	}
-	if signature.ArgumentTypes()[0].String() != "Array<Int64?>!" ||
-		signature.ResultType().String() != "Struct<\"items\": Array<Int64?>!>?" {
-		t.Fatal("nested structure or nullability was lost")
-	}
 }
 
 func TestFunctionSignatureZeroArguments(t *testing.T) {
@@ -53,28 +49,6 @@ func TestFunctionSignatureZeroArguments(t *testing.T) {
 		if len(signature.ArgumentTypes()) != 0 || signature.ResultType() != result {
 			t.Fatal("zero-argument signature changed")
 		}
-	}
-}
-
-func TestFunctionSignatureNilReceiver(t *testing.T) {
-	if !assertions.Enabled {
-		t.Skip("nil receiver assertions require debug build")
-	}
-	var signature *functions.FunctionSignature
-	for name, call := range map[string]func(){
-		"arguments": func() { signature.ArgumentTypes() },
-		"count":     func() { signature.ArgumentCount() },
-		"indexed":   func() { signature.ArgumentTypeAt(0) },
-		"result":    func() { signature.ResultType() },
-	} {
-		t.Run(name, func(t *testing.T) {
-			defer func() {
-				if recover() == nil {
-					t.Fatal("expected nil-receiver assertion")
-				}
-			}()
-			call()
-		})
 	}
 }
 

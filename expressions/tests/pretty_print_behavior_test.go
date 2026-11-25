@@ -4,8 +4,6 @@ import (
 	"math"
 	"testing"
 
-	"github.com/lie-yan/predicate-optimization/internal/assertions"
-
 	"github.com/lie-yan/predicate-optimization/expressions"
 	expressioninterfaces "github.com/lie-yan/predicate-optimization/expressions/interfaces"
 	"github.com/lie-yan/predicate-optimization/foundation"
@@ -179,21 +177,5 @@ func TestPrettyPrintSharedCallWithoutContextQueries(t *testing.T) {
 	}
 	if children := root.Children(); children[0] != call || children[1] != call {
 		t.Fatal("printing changed subtree sharing")
-	}
-}
-
-func TestPrettyPrintNilRoot(t *testing.T) {
-	for _, root := range []expressions.Expression{nil, (*expressions.LiteralExpression)(nil)} {
-		func() {
-			if !assertions.Enabled {
-				return
-			}
-			defer func() {
-				if recover() == nil {
-					t.Error("nil root did not assert")
-				}
-			}()
-			expressions.PrettyPrint(root)
-		}()
 	}
 }

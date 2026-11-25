@@ -8,7 +8,6 @@ import (
 	"github.com/lie-yan/predicate-optimization/expressions/interfaces"
 	"github.com/lie-yan/predicate-optimization/expressions/utils"
 	"github.com/lie-yan/predicate-optimization/foundation"
-	testfunctions "github.com/lie-yan/predicate-optimization/testbed/functions"
 	"github.com/lie-yan/predicate-optimization/types"
 )
 
@@ -40,14 +39,12 @@ type alternateOpaque struct{ keyedOpaque }
 func TestValidationIdentityKeys(t *testing.T) {
 	nonnull := fixture(types.NewBoolType(foundation.NonNull))
 	nullable := fixture(types.NewBoolType(foundation.MayNull))
-	provider := fixture(testfunctions.NewStandardContext())
 	validators := []struct {
 		name string
 		run  func(expressions.Expression) error
 	}{
 		{"structural", utils.Validate},
 		{"optimization", utils.ValidateForOptimization},
-		{"legacy", func(root expressions.Expression) error { return utils.ValidateWithContext(root, provider) }},
 	}
 	for _, opaque := range []bool{false, true} {
 		makeNode := func(parts []string, alternate bool, typ types.Type) expressions.Expression {

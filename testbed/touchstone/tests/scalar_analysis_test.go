@@ -77,8 +77,8 @@ func touchstoneGuardDomain(t *testing.T, f *fixture.Touchstone, guard expression
 	all := touchstoneMust(finite.NewExcludedEquatableValueSet(testbedvalues.ValueFactory{}, article.Type(), nil))
 	base := touchstoneMust(scoped_reasoning.NewInputDomain(scope, article, all, article.Type().Nullability() == foundation.MayNull, nil))
 	premise := touchstoneMust(scope.RegisterPremise(guard))
-	conclusion, present := touchstoneMust(scoped_reasoning.RestrictToTrue(touchstoneSummary(t, f, guard), base, premise)).Get()
-	if !present || conclusion.Kind() != scoped_reasoning.RestrictedDomain {
+	conclusion := touchstoneMust(scoped_reasoning.RestrictToTrue(touchstoneSummary(t, f, guard), base, premise))
+	if conclusion.Kind() != scoped_reasoning.RestrictedDomain {
 		t.Fatal("guard restriction missing")
 	}
 	domain, present := conclusion.RestrictedDomain().Get()

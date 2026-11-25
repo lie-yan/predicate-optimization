@@ -98,8 +98,8 @@ func checkQueries(t *testing.T, context functioninterfaces.FunctionContext, summ
 			t.Fatal("wrong known truth")
 		}
 	}
-	result, present := must(scoped_reasoning.RestrictToTrue(summary, input, premise)).Get()
-	if !present || result.Summary() != summary || result.InputDomain() != input || result.Scope() != input.Scope() {
+	result := must(scoped_reasoning.RestrictToTrue(summary, input, premise))
+	if result.Summary() != summary || result.InputDomain() != input || result.Scope() != input.Scope() {
 		t.Fatal("restriction lost context")
 	}
 	if _, known := result.Truth().Get(); known {
@@ -232,7 +232,7 @@ func TestQueriesOnRangeGuardAndRetainedDependencies(t *testing.T) {
 		checkQueries(t, context, summaryOf(context, predicate), input, premise, inputs)
 	}
 	// Adding the same occurrence again deduplicates it; it never discharges it.
-	result, _ := must(scoped_reasoning.RestrictToTrue(guardSummary, input, guardPremise)).Get()
+	result := must(scoped_reasoning.RestrictToTrue(guardSummary, input, guardPremise))
 	if len(result.Premises()) != 1 || result.Premises()[0] != guardPremise {
 		t.Fatal("retained guard lost or duplicated")
 	}
@@ -242,7 +242,7 @@ func TestQueriesOnRangeGuardAndRetainedDependencies(t *testing.T) {
 	}
 	// The same expression registered again is a distinct dependency.
 	otherOccurrence := must(scope.RegisterPremise(guard))
-	other, _ := must(scoped_reasoning.RestrictToTrue(guardSummary, input, otherOccurrence)).Get()
+	other := must(scoped_reasoning.RestrictToTrue(guardSummary, input, otherOccurrence))
 	if len(other.Premises()) != 2 {
 		t.Fatal("distinct guard occurrences collapsed")
 	}
@@ -349,8 +349,8 @@ func TestQueriesPropagateErrorsAndAssertPreconditions(t *testing.T) {
 		}
 		for _, set := range []*failingSet{{ValueSet: possible, intersectError: cause}, {ValueSet: possible, intersection: &failingSet{ValueSet: possible, emptyError: cause}}} {
 			bad := must(scoped_reasoning.NewInputDomain(scope, ref, set, false, nil))
-			result, err := scoped_reasoning.RestrictToTrue(summary, bad, premise)
-			if _, present := result.Get(); present || !errors.Is(err, cause) {
+			_, err := scoped_reasoning.RestrictToTrue(summary, bad, premise)
+			if !errors.Is(err, cause) {
 				t.Fatalf("restriction suppressed error: %v", err)
 			}
 		}

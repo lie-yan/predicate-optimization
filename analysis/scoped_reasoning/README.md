@@ -113,14 +113,14 @@ The package functions in [queries.go](queries.go) consume an exact `facts.Predic
 | `ProveTruth(summary, input)` | Does this predicate have a uniform result over the possible inputs? | All input premises. |
 | `RestrictToTrue(summary, input, condition)` | Which possible inputs remain if this predicate is required to be true? | All input premises plus the condition occurrence. |
 
-Both return `(foundation.Optional[ScopedConclusion], error)`. There are four distinct situations:
+`ProveTruth` returns `(foundation.Optional[ScopedConclusion], error)`; `RestrictToTrue` returns `(ScopedConclusion, error)`. There are four distinct situations:
 
 - A present `KnownTruth(Null)` means the predicate result is known to be SQL NULL.
 - An absent conclusion with no error means ProveTruth established no uniform truth over the supplied inputs.
-- A present `Unreachable` means no inputs remain possible under the dependencies.
+- An `Unreachable` conclusion means no inputs remain possible under the dependencies.
 - An error means the operation failed, including an unsupported exact set operation.
 
-RestrictToTrue always returns a present conclusion on success. These functions use explicit arguments; they need no mutable fact registry or evaluation context.
+`RestrictToTrue` returns a conclusion directly on success: `RestrictedDomain` or `Unreachable`. These functions use explicit arguments; they need no mutable fact registry or evaluation context.
 
 ### ProveTruth: test whether every possible input agrees
 

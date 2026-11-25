@@ -147,10 +147,7 @@ func Example_scalarRangeGuard() {
 	// Registration records an occurrence; restriction establishes its true-input
 	// domain conditionally, retaining that occurrence as a dependency.
 	premise := fixtures.Must(scope.RegisterPremise(guard))
-	restriction, hasRestriction := fixtures.Must(scoped_reasoning.RestrictToTrue(guardSummary, input, premise)).Get()
-	if !hasRestriction {
-		panic("expected restriction")
-	}
+	restriction := fixtures.Must(scoped_reasoning.RestrictToTrue(guardSummary, input, premise))
 	restricted, hasDomain := restriction.RestrictedDomain().Get()
 	if !hasDomain {
 		panic("expected reachable restricted domain")

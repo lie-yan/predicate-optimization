@@ -92,7 +92,7 @@ func TestWithChildrenCallsRebindWithoutEvaluation(t *testing.T) {
 	if !twice.EqualsTo(root) || ctx.queries != 2 {
 		t.Fatal("rebuilt call lost its context")
 	}
-	if err := utils.ValidateWithContext(rebuilt, provider); err != nil {
+	if err := utils.ValidateForOptimization(rebuilt); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := root.WithChildren([]expressions.Expression{maybe, two}); err == nil {

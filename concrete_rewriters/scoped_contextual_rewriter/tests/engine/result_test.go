@@ -103,7 +103,7 @@ func TestRewriteStepRejectsBadAssociations(t *testing.T) {
 		t.Fatal("stale proof accepted", err)
 	}
 	// A restriction is not a KnownTruth substitution, even under the same scope.
-	restriction, _ := must(scoped_reasoning.RestrictToTrue(a.Guard().Summary, a.Input(), a.Premise())).Get()
+	restriction := must(scoped_reasoning.RestrictToTrue(a.Guard().Summary, a.Input(), a.Premise()))
 	if _, err := a.NewStep(engine.RewriteContext{Attempt: a, Path: engine.OccurrencePath{1, 0}}, target, target, replacement, foundation.Some(restriction)); !errors.Is(err, rewriter.ErrInvalidReplacement) {
 		t.Fatal("non-truth conclusion accepted", err)
 	}

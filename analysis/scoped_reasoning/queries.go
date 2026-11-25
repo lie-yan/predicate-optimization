@@ -66,35 +66,34 @@ func ProveTruth(summary *facts.PredicateSummary, input *InputDomain) (foundation
 // unchanged. The caller associates the token with the actual retained occurrence.
 // Success always returns a conclusion: RestrictedDomain or Unreachable. This is
 // a conditional restriction, not an equivalent replacement for the predicate.
-func RestrictToTrue(summary *facts.PredicateSummary, input *InputDomain, condition *Premise) (foundation.Optional[ScopedConclusion], error) {
-	absent := foundation.Optional[ScopedConclusion]{}
+func RestrictToTrue(summary *facts.PredicateSummary, input *InputDomain, condition *Premise) (ScopedConclusion, error) {
 	if err := checkOperand(summary, input); err != nil {
-		return absent, err
+		return ScopedConclusion{}, err
 	}
 	condition.assertConstructed()
 	if !input.Scope().EqualsTo(condition.Scope()) {
-		return absent, fmt.Errorf("%w: condition premise belongs to another scope", value_set.ErrInvalidInput)
+		return ScopedConclusion{}, fmt.Errorf("%w: condition premise belongs to another scope", value_set.ErrInvalidInput)
 	}
 	if !summary.Source().EqualsTo(condition.Expression()) {
-		return absent, fmt.Errorf("%w: condition premise must match the summary source", value_set.ErrInvalidInput)
+		return ScopedConclusion{}, fmt.Errorf("%w: condition premise must match the summary source", value_set.ErrInvalidInput)
 	}
 
 	// Restriction keeps only true inputs; SQL false and null outcomes do not pass.
 	possible, err := input.PossibleValues().Intersect(summary.TrueSet())
 	if err != nil {
-		return absent, err
+		return ScopedConclusion{}, err
 	}
 	nullTruth, _ := summary.NullTruth().Get()
 	nullPossible := input.NullPossible() && nullTruth == foundation.True
 	premises := append(input.Premises(), condition)
 	restricted, err := NewInputDomain(input.Scope(), input.Operand(), possible, nullPossible, premises)
 	if err != nil {
-		return absent, err
+		return ScopedConclusion{}, err
 	}
 	conclusion := ScopedConclusion{summary: summary, input: input, premises: restricted.Premises()}
 	empty, err := possible.IsEmpty()
 	if err != nil {
-		return absent, err
+		return ScopedConclusion{}, err
 	}
 	// Even unreachability is conditional on retaining the source premise.
 	if empty && !nullPossible {
@@ -103,7 +102,7 @@ func RestrictToTrue(summary *facts.PredicateSummary, input *InputDomain, conditi
 		conclusion.kind = RestrictedDomain
 		conclusion.restricted = foundation.Some(restricted)
 	}
-	return foundation.Some(conclusion), nil
+	return conclusion, nil
 }
 
 // checkOperand requires the same column and full declared Type. Set compatibility

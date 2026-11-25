@@ -44,7 +44,9 @@ func TestFailedRebindingPreservesGraph(t *testing.T) {
 	if root.Children()[0] != one || root.Children()[1] != one {
 		t.Fatal("original mutated")
 	}
-	if err := utils.ValidateWithContext(root, provider); err != nil {
+	// Restore the paired provider before checking the preserved graph.
+	ctx.err = nil
+	if err := utils.ValidateForOptimization(root); err != nil {
 		t.Fatal(err)
 	}
 }

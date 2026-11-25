@@ -116,11 +116,10 @@ func (r *Engine) NewAttempt(source *expressions.LogicalExpression, guard GuardCa
 	if err != nil {
 		return absent, err
 	}
-	result, err := scoped_reasoning.RestrictToTrue(guard.Summary, input, premise)
+	conclusion, err := scoped_reasoning.RestrictToTrue(guard.Summary, input, premise)
 	if err != nil {
 		return absent, err
 	}
-	conclusion, _ := result.Get() // RestrictToTrue always returns a conclusion on success.
 	// A contradictory guard has no passing inputs. Declining here does not
 	// replace the owner with False; contradiction rewriting is a separate task.
 	if conclusion.Kind() == scoped_reasoning.Unreachable {

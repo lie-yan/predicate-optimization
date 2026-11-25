@@ -98,7 +98,7 @@ func TestTouchstoneSchemasAndValidation(t *testing.T) {
 			}
 		}
 		for _, root := range []expressions.Expression{f.Input, f.Expected} {
-			if err := utils.ValidateWithContext(root, f.Context); err != nil {
+			if err := utils.ValidateForOptimization(root); err != nil {
 				t.Fatal(err)
 			}
 		}

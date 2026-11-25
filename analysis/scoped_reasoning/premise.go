@@ -2,25 +2,6 @@ package scoped_reasoning
 
 import "github.com/lie-yan/predicate-optimization/expressions"
 
-// Scope is an opaque immutable scope identity owned by one ScopedFactContext.
-// Obtain it through NewScope; copying a constructed token preserves its identity.
-type (
-	Scope         struct{ identity *scopeIdentity }
-	scopeIdentity struct{ owner *contextIdentity }
-)
-
-func (s *Scope) EqualsTo(other *Scope) bool {
-	s.assertConstructed()
-	other.assertConstructed()
-	return s.identity == other.identity
-}
-
-func (s *Scope) assertConstructed() {
-	if s == nil || s.identity == nil {
-		panic("scoped_reasoning: expected constructed Scope")
-	}
-}
-
 // Premise identifies one retained expression occurrence, not a proposition's proof.
 // Instances share an immutable expression and scope; copying preserves identity.
 // Obtain premises through RegisterPremise; the zero value is invalid.

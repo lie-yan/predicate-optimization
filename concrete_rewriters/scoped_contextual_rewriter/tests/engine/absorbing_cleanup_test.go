@@ -147,7 +147,7 @@ func TestAbsorbingCleanupRetainsScopedDependencies(t *testing.T) {
 	if !present {
 		t.Fatal("expected False under guard")
 	}
-	children := []expressions.Expression{a, proof.Expression}
+	children := []expressions.Expression{a, proof.Expression()}
 	absorbed, present := must(cleaner.CleanupLogical(group, children)).Get()
 	if !present {
 		t.Fatal("eligible A AND False not absorbed")
@@ -159,9 +159,9 @@ func TestAbsorbingCleanupRetainsScopedDependencies(t *testing.T) {
 		t.Fatal("NOT cleanup missing")
 	}
 	notStep := must(attempt.NewStep(engine.RewriteContext{Attempt: attempt, Path: engine.OccurrencePath{1}}, negation, must(negation.WithChildren([]expressions.Expression{absorbed})), cleaned, absent))
-	result := engine.NewRewriteResult(cleaned, append(proof.Steps, absorbStep, notStep))
-	conclusion, _ := result.Steps[0].Conclusion.Get()
-	if len(result.Steps) != 3 || len(conclusion.Premises()) != 1 || !conclusion.Premises()[0].EqualsTo(attempt.Premise) {
+	result := engine.NewRewriteResult(cleaned, append(proof.Steps(), absorbStep, notStep))
+	conclusion, _ := result.Steps()[0].Conclusion.Get()
+	if len(result.Steps()) != 3 || len(conclusion.Premises()) != 1 || !conclusion.Premises()[0].EqualsTo(attempt.Premise()) {
 		t.Fatal("absorbing cleanup lost the scoped dependency")
 	}
 }

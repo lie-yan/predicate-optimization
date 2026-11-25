@@ -170,11 +170,11 @@ func TestQueriesMatchInterpreterOnFiniteDomains(t *testing.T) {
 				if typ.IsOrderable() {
 					predicates = append(predicates, comparison(context, foundation.LessThan, ref, literal(domain[1])))
 				}
-				factsContext := scoped_reasoning.NewScopedFactContext()
-				scope := factsContext.NewScope()
+
+				scope := scoped_reasoning.NewScope()
 				for _, predicate := range predicates {
 					summary := summaryOf(context, predicate)
-					premise := must(factsContext.RegisterPremise(scope, predicate))
+					premise := must(scope.RegisterPremise(predicate))
 					for mask := 0; mask < 1<<len(domain); mask++ {
 						var selected []valueinterfaces.Value
 						for i, value := range domain {
@@ -213,9 +213,9 @@ func TestQueriesOnRangeGuardAndRetainedDependencies(t *testing.T) {
 	number := func(n int64) expressions.Expression { return literal(must(testbedvalues.NewInteger(nonNull, n))) }
 	guard := logical(foundation.And, comparison(context, foundation.GreaterThanOrEqual, ref, number(-128)), comparison(context, foundation.LessThan, ref, number(10)))
 	guardSummary := summaryOf(context, guard)
-	factsContext := scoped_reasoning.NewScopedFactContext()
-	scope := factsContext.NewScope()
-	guardPremise := must(factsContext.RegisterPremise(scope, guard))
+
+	scope := scoped_reasoning.NewScope()
+	guardPremise := must(scope.RegisterPremise(guard))
 	// The caller establishes the guard's true-input restriction while retaining it.
 	input := must(scoped_reasoning.NewInputDomain(scope, ref, guardSummary.TrueSet(), false, []*scoped_reasoning.Premise{guardPremise}))
 	var inputs []valueinterfaces.Value
@@ -228,7 +228,7 @@ func TestQueriesOnRangeGuardAndRetainedDependencies(t *testing.T) {
 		comparison(context, foundation.Equal, ref, number(3)),
 		comparison(context, foundation.NotEqual, ref, number(3)),
 	} {
-		premise := must(factsContext.RegisterPremise(scope, predicate))
+		premise := must(scope.RegisterPremise(predicate))
 		checkQueries(t, context, summaryOf(context, predicate), input, premise, inputs)
 	}
 	// Adding the same occurrence again deduplicates it; it never discharges it.
@@ -241,7 +241,7 @@ func TestQueriesOnRangeGuardAndRetainedDependencies(t *testing.T) {
 		t.Fatal("guard changed domain or globally refined Type")
 	}
 	// The same expression registered again is a distinct dependency.
-	otherOccurrence := must(factsContext.RegisterPremise(scope, guard))
+	otherOccurrence := must(scope.RegisterPremise(guard))
 	other, _ := must(scoped_reasoning.RestrictToTrue(guardSummary, input, otherOccurrence)).Get()
 	if len(other.Premises()) != 2 {
 		t.Fatal("distinct guard occurrences collapsed")
@@ -255,9 +255,9 @@ func TestQueriesRejectMismatchedEvidence(t *testing.T) {
 	one := literal(must(testbedvalues.NewInteger(must(types.NewIntType(types.Int64, foundation.NonNull)), 1)))
 	predicate := comparison(context, foundation.Equal, ref, one)
 	summary := summaryOf(context, predicate)
-	factsContext := scoped_reasoning.NewScopedFactContext()
-	scope := factsContext.NewScope()
-	premise := must(factsContext.RegisterPremise(scope, predicate))
+
+	scope := scoped_reasoning.NewScope()
+	premise := must(scope.RegisterPremise(predicate))
 	input := must(scoped_reasoning.NewInputDomain(scope, ref, summary.TrueSet(), false, nil))
 	otherColumn := must(expressions.NewReferenceExpression(must(testexpressions.NewColumnID("t", "y")), typ, "x"))
 	for _, operand := range []*expressions.ReferenceExpression{otherColumn, reference(must(typ.WithNullability(foundation.NonNull))), reference(must(types.NewIntType(types.Int32, foundation.MayNull)))} {
@@ -274,11 +274,10 @@ func TestQueriesRejectMismatchedEvidence(t *testing.T) {
 			t.Fatalf("restriction operand mismatch: %v", err)
 		}
 	}
-	foreign := scoped_reasoning.NewScopedFactContext()
+
 	for _, bad := range []*scoped_reasoning.Premise{
-		must(factsContext.RegisterPremise(factsContext.NewScope(), predicate)),
-		must(foreign.RegisterPremise(foreign.NewScope(), predicate)),
-		must(factsContext.RegisterPremise(scope, logical(foundation.Not, predicate))),
+		must(scoped_reasoning.NewScope().RegisterPremise(predicate)),
+		must(scope.RegisterPremise(logical(foundation.Not, predicate))),
 	} {
 		if _, err := scoped_reasoning.RestrictToTrue(summary, input, bad); !errors.Is(err, value_set.ErrInvalidInput) {
 			t.Fatalf("bad condition accepted: %v", err)
@@ -286,7 +285,7 @@ func TestQueriesRejectMismatchedEvidence(t *testing.T) {
 	}
 	// Structural equality admits an independently built copy of the source.
 	copy := comparison(context, foundation.Equal, reference(typ), one)
-	if _, err := scoped_reasoning.RestrictToTrue(summary, input, must(factsContext.RegisterPremise(scope, copy))); err != nil {
+	if _, err := scoped_reasoning.RestrictToTrue(summary, input, must(scope.RegisterPremise(copy))); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -334,9 +333,9 @@ func TestQueriesPropagateErrorsAndAssertPreconditions(t *testing.T) {
 	typ := must(types.NewIntType(types.Int64, foundation.NonNull))
 	ref := reference(typ)
 	summary := summaryOf(context, comparison(context, foundation.Equal, ref, literal(must(testbedvalues.NewInteger(typ, 1)))))
-	factsContext := scoped_reasoning.NewScopedFactContext()
-	scope := factsContext.NewScope()
-	premise := must(factsContext.RegisterPremise(scope, summary.Source()))
+
+	scope := scoped_reasoning.NewScope()
+	premise := must(scope.RegisterPremise(summary.Source()))
 	possible := must(finite.NewEquatableValueSet(testbedvalues.ValueFactory{}, typ, []valueinterfaces.Value{must(testbedvalues.NewInteger(typ, 1)), must(testbedvalues.NewInteger(typ, 2))}))
 	input := must(scoped_reasoning.NewInputDomain(scope, ref, possible, false, nil))
 	sentinel := errors.New("set failure")

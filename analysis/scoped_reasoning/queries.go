@@ -73,7 +73,7 @@ func RestrictToTrue(summary *facts.PredicateSummary, input *InputDomain, conditi
 	}
 	condition.assertConstructed()
 	if !input.Scope().EqualsTo(condition.Scope()) {
-		return absent, fmt.Errorf("%w: condition premise belongs to another scope or context", value_set.ErrInvalidInput)
+		return absent, fmt.Errorf("%w: condition premise belongs to another scope", value_set.ErrInvalidInput)
 	}
 	if !summary.Source().EqualsTo(condition.Expression()) {
 		return absent, fmt.Errorf("%w: condition premise must match the summary source", value_set.ErrInvalidInput)

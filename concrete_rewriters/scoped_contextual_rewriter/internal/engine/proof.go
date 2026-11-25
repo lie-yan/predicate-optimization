@@ -22,7 +22,7 @@ func (a *RewriteAttempt) ProveLiteral(source expressions.Expression, context Rew
 	if a == nil || context.Attempt != a || assertions.IsNil(source) {
 		return absent, fmt.Errorf("%w: proof at %v: missing source or foreign attempt", rewriter.ErrInvalidReplacement, context.Path)
 	}
-	original, err := context.Path.Resolve(a.Source)
+	original, err := context.Path.Resolve(a.source)
 	if err != nil {
 		return absent, err
 	}
@@ -31,7 +31,7 @@ func (a *RewriteAttempt) ProveLiteral(source expressions.Expression, context Rew
 	}
 	// Freeze the guard subtree and its AND ancestors. A later visit may rebuild
 	// ancestors from accepted child results, but cannot substitute them here.
-	if a.Guard.Path.IsPrefixOf(context.Path) || context.Path.IsPrefixOf(a.Guard.Path) {
+	if a.guard.Path.IsPrefixOf(context.Path) || context.Path.IsPrefixOf(a.guard.Path) {
 		return absent, nil
 	}
 	boolean, ok := source.Type().(*types.BoolType)
@@ -42,7 +42,7 @@ func (a *RewriteAttempt) ProveLiteral(source expressions.Expression, context Rew
 	// Analyze the original predicate, then ask what it means under the attempt's
 	// inputs. For x IN [1,2] guarding x == 3, the original true set is {3};
 	// disjointness proves False locally without changing that global summary.
-	analysis, err := a.Rule.Extractor.Extract(source)
+	analysis, err := a.rule.extractor.Extract(source)
 	if err != nil {
 		return absent, err
 	}
@@ -50,10 +50,10 @@ func (a *RewriteAttempt) ProveLiteral(source expressions.Expression, context Rew
 		return absent, nil
 	}
 	summary, _ := analysis.Summary().Get()
-	if !summary.Operand().EqualsTo(a.Input.Operand()) {
+	if !summary.Operand().EqualsTo(a.input.Operand()) {
 		return absent, nil
 	}
-	result, err := scoped_reasoning.ProveTruth(summary, a.Input)
+	result, err := scoped_reasoning.ProveTruth(summary, a.input)
 	if err != nil {
 		return absent, err
 	}
@@ -64,7 +64,7 @@ func (a *RewriteAttempt) ProveLiteral(source expressions.Expression, context Rew
 
 	// A known value does not alone permit suppressing its computation. Inspect
 	// omission eligibility before constructing the replacement; never Evaluate.
-	eligible, err := a.Rule.cleanup.CanOmit(source)
+	eligible, err := a.rule.cleanup.CanOmit(source)
 	if err != nil {
 		return absent, err
 	}
@@ -72,7 +72,7 @@ func (a *RewriteAttempt) ProveLiteral(source expressions.Expression, context Rew
 		return absent, nil
 	}
 	truth, _ := conclusion.Truth().Get()
-	literal, err := boolean_cleanup.TruthLiteral(a.Rule.factory, boolean, truth)
+	literal, err := boolean_cleanup.TruthLiteral(a.rule.factory, boolean, truth)
 	if err != nil {
 		return absent, err
 	}
@@ -81,6 +81,6 @@ func (a *RewriteAttempt) ProveLiteral(source expressions.Expression, context Rew
 		return absent, err
 	}
 	// NewStep owns its path; this fresh slice transfers that ownership to the
-	// caller. The completed-rewrite snapshot still makes its defensive copy.
-	return foundation.Some(RewriteResult{Expression: literal, Steps: []RewriteStep{step}}), nil
+	// caller; evidence accessors copy it before exposing it.
+	return foundation.Some(RewriteResult{expression: literal, steps: []RewriteStep{step}}), nil
 }

@@ -41,18 +41,18 @@ func TestScalarDomainsConditionalProofOwnership(t *testing.T) {
 				source := guardLogical(foundation.And, guard, target)
 				attempt := requireAttempt(t, rule, source, must(rule.SelectGuards(source))[0])
 				result, present := must(attempt.ProveLiteral(target, engine.RewriteContext{Attempt: attempt, Path: engine.OccurrencePath{1}})).Get()
-				if !present || len(result.Steps) != 1 {
+				if !present || len(result.Steps()) != 1 {
 					t.Fatal("missing conditional proof")
 				}
 				expected := must(expressions.NewLiteralExpression(must(testbedvalues.NewBool(target.Type().(*types.BoolType), j == 1))))
-				if !result.Expression.EqualsTo(expected) || result.Expression.Type() != target.Type() {
+				if !result.Expression().EqualsTo(expected) || result.Expression().Type() != target.Type() {
 					t.Fatal("wrong truth or lost exact Type instance")
 				}
-				conclusion, ok := result.Steps[0].Conclusion.Get()
-				if !ok || conclusion.InputDomain() != attempt.Input || len(conclusion.Premises()) != 1 || !conclusion.Premises()[0].EqualsTo(attempt.Premise) || conclusion.Summary().Source() != target {
+				conclusion, ok := result.Steps()[0].Conclusion.Get()
+				if !ok || conclusion.InputDomain() != attempt.Input() || len(conclusion.Premises()) != 1 || !conclusion.Premises()[0].EqualsTo(attempt.Premise()) || conclusion.Summary().Source() != target {
 					t.Fatal("proof lost owner association")
 				}
-				if previous != nil && (previous.Scope.EqualsTo(attempt.Scope) || previous.Premise.EqualsTo(attempt.Premise)) {
+				if previous != nil && (previous.Scope().EqualsTo(attempt.Scope()) || previous.Premise().EqualsTo(attempt.Premise())) {
 					t.Fatal("independent attempts shared proof identity")
 				}
 				previous = attempt

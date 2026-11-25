@@ -25,9 +25,9 @@ func stepFixture(t *testing.T) (*engine.RewriteAttempt, *expressions.CallExpress
 	target := guardComparison(provider, foundation.Equal, x, 3)
 	source := guardLogical(foundation.And, guard, guardLogical(foundation.Not, target))
 	attempt := requireAttempt(t, rule, source, must(rule.SelectGuards(source))[0])
-	analysis := must(rule.Extractor.Extract(target))
+	analysis := must(rule.Extractor().Extract(target))
 	summary, _ := analysis.Summary().Get()
-	proof, present := must(scoped_reasoning.ProveTruth(summary, attempt.Input)).Get()
+	proof, present := must(scoped_reasoning.ProveTruth(summary, attempt.Input())).Get()
 	if !present {
 		t.Fatal("expected uniform false proof")
 	}
@@ -43,11 +43,11 @@ func TestRewriteStepRecordsOriginalAndRebuiltExpressions(t *testing.T) {
 	if !substitution.Path.EqualsTo(engine.OccurrencePath{1, 0}) || substitution.Source != target || substitution.Before != target || substitution.After != falseLiteral {
 		t.Fatal("step lost association or retained caller path")
 	}
-	if p, present := substitution.Conclusion.Get(); !present || !p.Premises()[0].EqualsTo(a.Premise) {
+	if p, present := substitution.Conclusion.Get(); !present || !p.Premises()[0].EqualsTo(a.Premise()) {
 		t.Fatal("step lost guard dependency")
 	}
 
-	original := must((engine.OccurrencePath{1}).Resolve(a.Source))
+	original := must((engine.OccurrencePath{1}).Resolve(a.Source()))
 	rebuilt := must(original.WithChildren([]expressions.Expression{falseLiteral}))
 	trueLiteral := must(boolean_cleanup.TruthLiteral(testbedvalues.ValueFactory{}, original.Type().(*types.BoolType), foundation.True))
 	// Simulate the future fixed NOT cleanup, whose identity is NOT False = True.
@@ -59,10 +59,10 @@ func TestRewriteStepRecordsOriginalAndRebuiltExpressions(t *testing.T) {
 		t.Fatal("cleanup fabricated a scoped conclusion")
 	}
 	result := engine.NewRewriteResult(trueLiteral, []engine.RewriteStep{substitution, cleanup})
-	if len(result.Steps) != 2 {
+	if len(result.Steps()) != 2 {
 		t.Fatal("cleanup lost earlier substitution evidence")
 	}
-	if p, _ := result.Steps[0].Conclusion.Get(); !p.Premises()[0].EqualsTo(a.Premise) {
+	if p, _ := result.Steps()[0].Conclusion.Get(); !p.Premises()[0].EqualsTo(a.Premise()) {
 		t.Fatal("disappearing target syntax lost premise")
 	}
 }
@@ -72,8 +72,8 @@ func TestRewriteStepRejectsBadAssociations(t *testing.T) {
 	replacement := must(boolean_cleanup.TruthLiteral(testbedvalues.ValueFactory{}, target.Type().(*types.BoolType), foundation.False))
 	// Construct a distinct equal call; structural equality cannot replace source association.
 	equalTarget := must(expressions.NewCallExpression(target.Context(), target.Handle(), target.Arguments()))
-	otherAttempt := requireAttempt(t, a.Rule, a.Source, a.Guard)
-	foreignProof, _ := must(scoped_reasoning.ProveTruth(proof.Summary(), otherAttempt.Input)).Get()
+	otherAttempt := requireAttempt(t, a.Rule(), a.Source(), a.Guard())
+	foreignProof, _ := must(scoped_reasoning.ProveTruth(proof.Summary(), otherAttempt.Input())).Get()
 	for _, tc := range []struct {
 		name                  string
 		context               engine.RewriteContext
@@ -97,13 +97,13 @@ func TestRewriteStepRejectsBadAssociations(t *testing.T) {
 		})
 	}
 	// An equal but distinct summary source cannot certify this source occurrence.
-	summary, _ := must(a.Rule.Extractor.Extract(equalTarget)).Summary().Get()
-	staleProof, _ := must(scoped_reasoning.ProveTruth(summary, a.Input)).Get()
+	summary, _ := must(a.Rule().Extractor().Extract(equalTarget)).Summary().Get()
+	staleProof, _ := must(scoped_reasoning.ProveTruth(summary, a.Input())).Get()
 	if _, err := a.NewStep(engine.RewriteContext{Attempt: a, Path: engine.OccurrencePath{1, 0}}, target, target, replacement, foundation.Some(staleProof)); !errors.Is(err, rewriter.ErrInvalidReplacement) {
 		t.Fatal("stale proof accepted", err)
 	}
 	// A restriction is not a KnownTruth substitution, even under the same scope.
-	restriction, _ := must(scoped_reasoning.RestrictToTrue(a.Guard.Summary, a.Input, a.Premise)).Get()
+	restriction, _ := must(scoped_reasoning.RestrictToTrue(a.Guard().Summary, a.Input(), a.Premise())).Get()
 	if _, err := a.NewStep(engine.RewriteContext{Attempt: a, Path: engine.OccurrencePath{1, 0}}, target, target, replacement, foundation.Some(restriction)); !errors.Is(err, rewriter.ErrInvalidReplacement) {
 		t.Fatal("non-truth conclusion accepted", err)
 	}
@@ -118,35 +118,26 @@ func TestRewriteResultOwnsEvidence(t *testing.T) {
 	left, right := engine.NewRewriteResult(replacement, steps), engine.NewRewriteResult(replacement, steps)
 	steps[0].Path[0] = 99
 	steps[0].After = target
-	left.Steps[0].Path[0] = 98
-	left.Steps = append(left.Steps, step)
-	if len(right.Steps) != 1 || !right.Steps[0].Path.EqualsTo(engine.OccurrencePath{1, 0}) || right.Steps[0].After != replacement {
+	left.Steps()[0].Path[0] = 98
+	if len(right.Steps()) != 1 || !right.Steps()[0].Path.EqualsTo(engine.OccurrencePath{1, 0}) || right.Steps()[0].After != replacement {
 		t.Fatal("results share mutable evidence storage")
 	}
 	// A later traversal can reject one child without changing the sibling result.
 	rejected := engine.NewRewriteResult(target, nil)
-	if rejected.Expression != target || len(rejected.Steps) != 0 || len(right.Steps) != 1 {
+	if rejected.Expression() != target || len(rejected.Steps()) != 0 || len(right.Steps()) != 1 {
 		t.Fatal("discarded changes contaminated retained sibling")
 	}
 }
 
 func TestRewriteStepRejectsForeignPremise(t *testing.T) {
 	a, target, proof := stepFixture(t)
-	owner := scoped_reasoning.NewScopedFactContext()
-	scope := owner.NewScope()
-	first := must(owner.RegisterPremise(scope, a.Guard.Expression))
-	second := must(owner.RegisterPremise(scope, a.Guard.Expression))
-	local := *a
-	local.Scope = scope
-	local.Premise = first
-	local.Input = must(scoped_reasoning.NewInputDomain(scope, a.Input.Operand(), a.Input.PossibleValues(), a.Input.NullPossible(), []*scoped_reasoning.Premise{first}))
-	conclusion, _ := must(scoped_reasoning.ProveTruth(proof.Summary(), local.Input)).Get()
+	// Same scope and values, but a different retained occurrence cannot justify this attempt.
+	premise := must(a.Scope().RegisterPremise(a.Guard().Expression))
+	input := must(scoped_reasoning.NewInputDomain(a.Scope(), a.Input().Operand(), a.Input().PossibleValues(), a.Input().NullPossible(), []*scoped_reasoning.Premise{premise}))
+	conclusion, _ := must(scoped_reasoning.ProveTruth(proof.Summary(), input)).Get()
 	replacement := must(boolean_cleanup.TruthLiteral(testbedvalues.ValueFactory{}, target.Type().(*types.BoolType), foundation.False))
-	context := engine.RewriteContext{Attempt: &local, Path: engine.OccurrencePath{1, 0}}
-	must(local.NewStep(context, target, target, replacement, foundation.Some(conclusion)))
-	// Corrupt just the expected premise: the scope, source, domain and truth match.
-	local.Premise = second
-	if _, err := local.NewStep(context, target, target, replacement, foundation.Some(conclusion)); !errors.Is(err, rewriter.ErrInvalidReplacement) {
+	context := engine.RewriteContext{Attempt: a, Path: engine.OccurrencePath{1, 0}}
+	if _, err := a.NewStep(context, target, target, replacement, foundation.Some(conclusion)); !errors.Is(err, rewriter.ErrInvalidReplacement) {
 		t.Fatal("foreign same-scope premise accepted", err)
 	}
 }
@@ -155,7 +146,7 @@ func TestRewriteStepProtectsGuardAndCleanupShape(t *testing.T) {
 	a, target, _ := stepFixture(t)
 	absent := foundation.Optional[scoped_reasoning.ScopedConclusion]{}
 	for _, path := range []engine.OccurrencePath{nil, {0}, {0, 0}} {
-		source := must(path.Resolve(a.Source))
+		source := must(path.Resolve(a.Source()))
 		if _, err := a.NewStep(engine.RewriteContext{Attempt: a, Path: path}, source, source, source, absent); !errors.Is(err, rewriter.ErrInvalidReplacement) {
 			t.Fatal("protected occurrence admitted a local step", path, err)
 		}
@@ -163,7 +154,7 @@ func TestRewriteStepProtectsGuardAndCleanupShape(t *testing.T) {
 	if _, err := a.NewStep(engine.RewriteContext{Attempt: a, Path: engine.OccurrencePath{1, 0}}, target, target, target, absent); !errors.Is(err, rewriter.ErrInvalidReplacement) {
 		t.Fatal("non-logical cleanup accepted", err)
 	}
-	source := must((engine.OccurrencePath{1}).Resolve(a.Source))
+	source := must((engine.OccurrencePath{1}).Resolve(a.Source()))
 	changedForm := guardLogical(foundation.Or, target, target)
 	if _, err := a.NewStep(engine.RewriteContext{Attempt: a, Path: engine.OccurrencePath{1}}, source, changedForm, target, absent); !errors.Is(err, rewriter.ErrInvalidReplacement) {
 		t.Fatal("changed logical form before cleanup accepted", err)

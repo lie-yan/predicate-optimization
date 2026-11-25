@@ -43,16 +43,14 @@ func expectAssertion(t *testing.T, call func()) {
 }
 
 func TestScopedOccurrenceIdentity(t *testing.T) {
-	context := scoped_reasoning.NewScopedFactContext()
-	scope, other := context.NewScope(), context.NewScope()
-	foreign := scoped_reasoning.NewScopedFactContext().NewScope()
-	if !scope.EqualsTo(scope) || scope.EqualsTo(other) || scope.EqualsTo(foreign) {
+	scope, other := scoped_reasoning.NewScope(), scoped_reasoning.NewScope()
+	if !scope.EqualsTo(scope) || scope.EqualsTo(other) {
 		t.Fatal("scope identity mismatch")
 	}
 	expression := condition()
-	first := must(context.RegisterPremise(scope, expression))
-	second := must(context.RegisterPremise(scope, expression))
-	third := must(context.RegisterPremise(other, expression))
+	first := must(scope.RegisterPremise(expression))
+	second := must(scope.RegisterPremise(expression))
+	third := must(other.RegisterPremise(expression))
 	if first.EqualsTo(second) || first.EqualsTo(third) || !first.EqualsTo(first) {
 		t.Fatal("shared expression collapsed occurrence identity")
 	}
@@ -63,22 +61,18 @@ func TestScopedOccurrenceIdentity(t *testing.T) {
 	if !scope.EqualsTo(&scopeCopy) || !first.EqualsTo(&premiseCopy) {
 		t.Fatal("token copying changed identity")
 	}
-	if _, err := context.RegisterPremise(foreign, expression); err == nil {
-		t.Fatal("foreign context accepted")
-	}
-	if _, err := context.RegisterPremise(scope, reference(must(types.NewIntType(types.Int64, foundation.NonNull)))); err == nil {
+	if _, err := scope.RegisterPremise(reference(must(types.NewIntType(types.Int64, foundation.NonNull)))); err == nil {
 		t.Fatal("non-Boolean premise accepted")
 	}
 }
 
 func TestInputDomainOwnershipAndScope(t *testing.T) {
-	context := scoped_reasoning.NewScopedFactContext()
-	scope := context.NewScope()
+	scope := scoped_reasoning.NewScope()
 	typ := must(types.NewIntType(types.Int64, foundation.MayNull))
 	operand := reference(typ)
 	possible := must(finite.NewEquatableValueSet(testbedvalues.ValueFactory{}, typ, []valueinterfaces.Value{must(testbedvalues.NewInteger(typ, 1)), must(testbedvalues.NewInteger(typ, 3))}))
 	expression := condition()
-	first, second := must(context.RegisterPremise(scope, expression)), must(context.RegisterPremise(scope, expression))
+	first, second := must(scope.RegisterPremise(expression)), must(scope.RegisterPremise(expression))
 	firstCopy := *first
 	dependencies := []*scoped_reasoning.Premise{first, second, &firstCopy}
 	domain := must(scoped_reasoning.NewInputDomain(scope, operand, possible, true, dependencies))
@@ -94,16 +88,9 @@ func TestInputDomainOwnershipAndScope(t *testing.T) {
 	if domain.Scope() != scope || domain.Operand() != operand || domain.PossibleValues() != possible || !domain.NullPossible() || operand.Type() != typ {
 		t.Fatal("immutable inputs or nullability changed")
 	}
-	for _, bad := range []*scoped_reasoning.Premise{
-		must(context.RegisterPremise(context.NewScope(), expression)),
-		func() *scoped_reasoning.Premise {
-			c := scoped_reasoning.NewScopedFactContext()
-			return must(c.RegisterPremise(c.NewScope(), expression))
-		}(),
-	} {
-		if _, err := scoped_reasoning.NewInputDomain(scope, operand, possible, false, []*scoped_reasoning.Premise{bad}); err == nil {
-			t.Fatal("foreign scope/context premise accepted")
-		}
+	foreign := must(scoped_reasoning.NewScope().RegisterPremise(expression))
+	if _, err := scoped_reasoning.NewInputDomain(scope, operand, possible, false, []*scoped_reasoning.Premise{foreign}); err == nil {
+		t.Fatal("foreign scope premise accepted")
 	}
 	// Scope survives even without premises; producer-established restrictions
 	// are represented without claiming that construction proves them.
@@ -114,7 +101,7 @@ func TestInputDomainOwnershipAndScope(t *testing.T) {
 }
 
 func TestInputDomainUniversesAndNullability(t *testing.T) {
-	scope := scoped_reasoning.NewScopedFactContext().NewScope()
+	scope := scoped_reasoning.NewScope()
 	bound := uint64(4)
 	for _, typ := range []types.Type{
 		must(types.NewBoolType(foundation.MayNull)), must(types.NewIntType(types.Int8, foundation.MayNull)),
@@ -152,7 +139,7 @@ func TestInputDomainUniversesAndNullability(t *testing.T) {
 }
 
 func TestInputDomainTypeCompatibility(t *testing.T) {
-	scope := scoped_reasoning.NewScopedFactContext().NewScope()
+	scope := scoped_reasoning.NewScope()
 	one, two := uint64(1), uint64(2)
 	for _, pair := range [][2]types.Type{
 		{must(types.NewIntType(types.Int8, foundation.MayNull)), must(types.NewIntType(types.Int64, foundation.NonNull))},
@@ -167,17 +154,13 @@ func TestInputDomainTypeCompatibility(t *testing.T) {
 }
 
 func TestScopedRepresentationsPreconditions(t *testing.T) {
-	context := scoped_reasoning.NewScopedFactContext()
-	scope := context.NewScope()
+
+	scope := scoped_reasoning.NewScope()
 	operand := reference(must(types.NewBoolType(foundation.NonNull)))
 	possible := must(finite.NewEquatableValueSet(testbedvalues.ValueFactory{}, operand.Type(), nil))
-	for _, bad := range []*scoped_reasoning.ScopedFactContext{nil, {}} {
-		expectAssertion(t, func() { bad.NewScope() })
-		expectAssertion(t, func() { _, _ = bad.RegisterPremise(scope, condition()) })
-	}
 	for _, bad := range []*scoped_reasoning.Scope{nil, {}} {
 		expectAssertion(t, func() { scope.EqualsTo(bad) })
-		expectAssertion(t, func() { _, _ = context.RegisterPremise(bad, condition()) })
+		expectAssertion(t, func() { _, _ = bad.RegisterPremise(condition()) })
 		expectAssertion(t, func() { _, _ = scoped_reasoning.NewInputDomain(bad, operand, possible, false, nil) })
 	}
 	for _, bad := range []*scoped_reasoning.Premise{nil, {}} {
@@ -187,8 +170,8 @@ func TestScopedRepresentationsPreconditions(t *testing.T) {
 			_, _ = scoped_reasoning.NewInputDomain(scope, operand, possible, false, []*scoped_reasoning.Premise{bad})
 		})
 	}
-	expectAssertion(t, func() { _, _ = context.RegisterPremise(scope, nil) })
-	expectAssertion(t, func() { _, _ = context.RegisterPremise(scope, (*expressions.ReferenceExpression)(nil)) })
+	expectAssertion(t, func() { _, _ = scope.RegisterPremise(nil) })
+	expectAssertion(t, func() { _, _ = scope.RegisterPremise((*expressions.ReferenceExpression)(nil)) })
 	expectAssertion(t, func() { _, _ = scoped_reasoning.NewInputDomain(scope, nil, possible, false, nil) })
 	expectAssertion(t, func() { _, _ = scoped_reasoning.NewInputDomain(scope, operand, nil, false, nil) })
 	expectAssertion(t, func() {

@@ -14,20 +14,20 @@ import (
 // It does not create nested owners, accept the candidate or publish a replacement.
 func (a *RewriteAttempt) Rewrite() (RewriteResult, error) {
 	assertions.NotNilPointer(a)
-	// Only constructor-established ownership may produce a completed receipt.
+	// Only a valid constructed attempt may complete a result.
 	if err := a.checkAttempt(); err != nil {
 		return RewriteResult{}, err
 	}
-	if err := a.checkRetainedGuard(a.Source); err != nil {
+	if err := a.checkRetainedGuard(a.source); err != nil {
 		return RewriteResult{}, err
 	}
-	result, err := a.Visit(a.Source, RewriteContext{Attempt: a})
+	result, err := a.Visit(a.source, RewriteContext{Attempt: a})
 	if err != nil {
 		return RewriteResult{}, err
 	}
-	// Bind the complete tree and evidence after all child rollback has finished.
+	// Mark completion after all child rollback has finished; result storage remains private.
 	// Visit and NewRewriteResult alone produce tentative, unpublished subtrees.
-	result.construction = &completedRewrite{owner: a, snapshot: NewRewriteResult(result.Expression, result.Steps)}
+	result.owner = a
 	return result, nil
 }
 
@@ -38,7 +38,7 @@ func (a *RewriteAttempt) Visit(source expressions.Expression, context RewriteCon
 	if a == nil || context.Attempt != a || assertions.IsNil(source) {
 		return RewriteResult{}, fmt.Errorf("%w: visit at %v: missing source or foreign attempt", rewriter.ErrInvalidReplacement, context.Path)
 	}
-	original, err := context.Path.Resolve(a.Source)
+	original, err := context.Path.Resolve(a.source)
 	if err != nil {
 		return RewriteResult{}, err
 	}
@@ -47,10 +47,10 @@ func (a *RewriteAttempt) Visit(source expressions.Expression, context RewriteCon
 	}
 	// The retained guard is immutable as a whole; shared objects elsewhere are
 	// separate occurrences and are still visited under the same conditional inputs.
-	if a.Guard.Path.IsPrefixOf(context.Path) {
-		return RewriteResult{Expression: source}, nil
+	if a.guard.Path.IsPrefixOf(context.Path) {
+		return RewriteResult{expression: source}, nil
 	}
-	protected := context.Path.IsPrefixOf(a.Guard.Path)
+	protected := context.Path.IsPrefixOf(a.guard.Path)
 	if !protected {
 		result, err := a.ProveLiteral(source, context)
 		if err != nil {
@@ -74,24 +74,24 @@ func (a *RewriteAttempt) Visit(source expressions.Expression, context RewriteCon
 		if err != nil {
 			return RewriteResult{}, err
 		}
-		proposed[i] = result.Expression
-		changed = changed || result.Expression != child
+		proposed[i] = result.expression
+		changed = changed || result.expression != child
 		if len(steps) == 0 {
-			steps = result.Steps
+			steps = result.steps
 		} else {
-			steps = append(steps, result.Steps...)
+			steps = append(steps, result.steps...)
 		}
 	}
 	before := source
 	if changed {
-		admitted, err := a.Rule.cleanup.CanChangeChildren(source, proposed)
+		admitted, err := a.rule.cleanup.CanChangeChildren(source, proposed)
 		if err != nil {
 			return RewriteResult{}, err
 		}
 		if !admitted {
 			// Example: foo(P) cannot consume the tentative P -> True. Restore foo(P)
 			// and drop all evidence beneath it; another sibling may still retain a proof.
-			return RewriteResult{Expression: source}, nil
+			return RewriteResult{expression: source}, nil
 		}
 		before, err = source.WithChildren(proposed)
 		if err != nil {
@@ -101,10 +101,10 @@ func (a *RewriteAttempt) Visit(source expressions.Expression, context RewriteCon
 	// Protected AND ancestors may rebuild accepted siblings, but no cleanup may
 	// remove/reposition the retained guard. Rebuilding itself needs no new step.
 	if protected {
-		return RewriteResult{Expression: before, Steps: steps}, nil
+		return RewriteResult{expression: before, steps: steps}, nil
 	}
 	if logical, ok := source.(*expressions.LogicalExpression); ok {
-		cleaned, err := a.Rule.cleanup.CleanupLogical(logical, proposed)
+		cleaned, err := a.rule.cleanup.CleanupLogical(logical, proposed)
 		if err != nil {
 			return RewriteResult{}, err
 		}
@@ -114,8 +114,8 @@ func (a *RewriteAttempt) Visit(source expressions.Expression, context RewriteCon
 				return RewriteResult{}, err
 			}
 			steps = append(steps, step)
-			return RewriteResult{Expression: after, Steps: steps}, nil
+			return RewriteResult{expression: after, steps: steps}, nil
 		}
 	}
-	return RewriteResult{Expression: before, Steps: steps}, nil
+	return RewriteResult{expression: before, steps: steps}, nil
 }

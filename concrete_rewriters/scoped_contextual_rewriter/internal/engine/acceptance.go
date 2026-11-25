@@ -20,69 +20,41 @@ func (a *RewriteAttempt) Accept(result RewriteResult) (foundation.Optional[expre
 	if err := a.checkAttempt(); err != nil {
 		return absent, err
 	}
-	if assertions.IsNil(result.Expression) || !result.Expression.Type().EqualsTo(a.Source.Type()) {
+	if assertions.IsNil(result.expression) || !result.expression.Type().EqualsTo(a.source.Type()) {
 		return absent, invalidAcceptance("missing candidate or changed result Type")
 	}
-	if err := a.checkRetainedGuard(result.Expression); err != nil {
+	if err := a.checkRetainedGuard(result.expression); err != nil {
 		return absent, err
 	}
 
-	// The traversal receipt covers changes with no separate local step (checked
-	// parent rebuilding) as well as steps whose target disappeared during cleanup.
-	// A manually assembled or subsequently altered result has no such coverage.
-	built := result.construction
-	if built == nil || built.owner != a || built.snapshot.Expression != result.Expression || len(built.snapshot.Steps) != len(result.Steps) {
+	// Private result fields can only be populated by engine construction. Subtree
+	// visits and manually constructed results never acquire a completed owner.
+	if result.owner != a {
 		return absent, invalidAcceptance("candidate is not this attempt's completed construction")
-	}
-	for i, step := range result.Steps {
-		recorded := built.snapshot.Steps[i]
-		if !step.Path.EqualsTo(recorded.Path) || step.Source != recorded.Source || step.Before != recorded.Before || step.After != recorded.After {
-			return absent, invalidAcceptance("changed construction step %d at %v", i, step.Path)
-		}
-		proof, present := step.Conclusion.Get()
-		originalProof, recordedProof := recorded.Conclusion.Get()
-		if present != recordedProof {
-			return absent, invalidAcceptance("changed conclusion presence at %v", step.Path)
-		}
-		// Reuse the existing source/Type/scope/domain/premise checks. Fixed cleanup
-		// identities and evaluation eligibility were established during traversal;
-		// matching the receipt preserves those decisions without provider queries.
-		if _, err := a.NewStep(RewriteContext{Attempt: a, Path: step.Path}, step.Source, step.Before, step.After, step.Conclusion); err != nil {
-			return absent, err
-		}
-		if present && (proof.Summary() != originalProof.Summary() || proof.InputDomain() != originalProof.InputDomain()) {
-			return absent, invalidAcceptance("changed conclusion association at %v", step.Path)
-		}
 	}
 
 	// Truth/provenance failures remain errors even for an unchanged or oversized
 	// candidate. Structural benefit is the final gate, never a substitute for proof.
-	if !Improves(reconstruction.MeasureExpression(a.Source), reconstruction.MeasureExpression(result.Expression)) {
+	if !Improves(reconstruction.MeasureExpression(a.source), reconstruction.MeasureExpression(result.expression)) {
 		return absent, nil
 	}
-	return foundation.Some(result.Expression), nil
+	return foundation.Some(result.expression), nil
 }
 
-// checkAttempt retains the constructor's exact summary-derived restriction and
-// occurrence ownership. In particular, a narrower hand-built InputDomain cannot
-// retroactively justify the traversal, even if it uses the same premise token.
+// Checks semantic associations of a constructed attempt without duplicating its state.
 func (a *RewriteAttempt) checkAttempt() error {
-	if a == nil || a.original == nil {
+	if a == nil || a.rule == nil || a.source == nil || a.scope == nil || a.premise == nil || a.input == nil {
 		return invalidAcceptance("expected a constructed attempt")
 	}
-	original := a.original
-	if a.Rule != original.Rule || a.Source != original.Source || a.Scope != original.Scope || a.Premise != original.Premise || a.Input != original.Input || a.Guard.Expression != original.Guard.Expression || a.Guard.Summary != original.Guard.Summary || !a.Guard.Path.EqualsTo(original.Guard.Path) {
-		return invalidAcceptance("attempt associations changed after construction")
-	}
-	boolean, ok := a.Guard.Expression.Type().(*types.BoolType)
-	if !ok || boolean.Nullability() != foundation.NonNull || a.Guard.Summary.Source() != a.Guard.Expression || !a.Guard.Summary.Type().EqualsTo(boolean) {
+	boolean, ok := a.guard.Expression.Type().(*types.BoolType)
+	if !ok || boolean.Nullability() != foundation.NonNull || a.guard.Summary.Source() != a.guard.Expression || !a.guard.Summary.Type().EqualsTo(boolean) {
 		return invalidAcceptance("guard must be the complete two-valued summary source")
 	}
-	if !a.Scope.EqualsTo(a.Premise.Scope()) || !a.Scope.EqualsTo(a.Input.Scope()) || a.Premise.Expression() != a.Guard.Expression || !a.Input.Operand().EqualsTo(a.Guard.Summary.Operand()) {
+	if !a.scope.EqualsTo(a.premise.Scope()) || !a.scope.EqualsTo(a.input.Scope()) || a.premise.Expression() != a.guard.Expression || !a.input.Operand().EqualsTo(a.guard.Summary.Operand()) {
 		return invalidAcceptance("guard, premise, scope and input disagree")
 	}
-	premises := a.Input.Premises()
-	if len(premises) != 1 || !premises[0].EqualsTo(a.Premise) {
+	premises := a.input.Premises()
+	if len(premises) != 1 || !premises[0].EqualsTo(a.premise) {
 		return invalidAcceptance("input must depend on exactly the retained guard premise")
 	}
 	return nil
@@ -91,11 +63,11 @@ func (a *RewriteAttempt) checkAttempt() error {
 // checkRetainedGuard preserves the original AND path and the exact frozen subtree.
 // Finding an equal guard elsewhere, or reaching it through OR, is insufficient.
 func (a *RewriteAttempt) checkRetainedGuard(candidate expressions.Expression) error {
-	if len(a.Guard.Path) == 0 {
+	if len(a.guard.Path) == 0 {
 		return invalidAcceptance("guard must be a conjunct below the owner")
 	}
-	var source expressions.Expression = a.Source
-	for depth, index := range a.Guard.Path {
+	var source expressions.Expression = a.source
+	for depth, index := range a.guard.Path {
 		before, originalAND := source.(*expressions.LogicalExpression)
 		after, candidateAND := candidate.(*expressions.LogicalExpression)
 		if !originalAND || !candidateAND || before.Operator() != foundation.And || after.Operator() != foundation.And || !before.Type().EqualsTo(after.Type()) || before.ChildCount() != after.ChildCount() {
@@ -106,7 +78,7 @@ func (a *RewriteAttempt) checkRetainedGuard(candidate expressions.Expression) er
 		}
 		source, candidate = before.ChildAt(index), after.ChildAt(index)
 	}
-	if source != a.Guard.Expression || candidate != a.Guard.Expression {
+	if source != a.guard.Expression || candidate != a.guard.Expression {
 		return invalidAcceptance("guard occurrence was lost, moved or replaced")
 	}
 	return nil

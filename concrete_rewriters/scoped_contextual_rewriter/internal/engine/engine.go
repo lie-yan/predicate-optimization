@@ -15,7 +15,7 @@ import (
 // tentative changes are confined to separately constructed RewriteAttempts.
 type Engine struct {
 	factory   valueinterfaces.ValueFactory
-	Extractor *fact_extraction.ScalarExtractor // Shared scalar analysis service; read-only after construction.
+	extractor *fact_extraction.ScalarExtractor // Shared scalar analysis service; read-only after construction.
 	cleanup   *boolean_cleanup.Cleaner
 }
 
@@ -35,7 +35,10 @@ type Engine struct {
 func New(factory valueinterfaces.ValueFactory, functionContext functioninterfaces.FunctionContext) *Engine {
 	return &Engine{
 		factory:   factory,
-		Extractor: fact_extraction.NewScalarExtractor(factory, functionContext),
+		extractor: fact_extraction.NewScalarExtractor(factory, functionContext),
 		cleanup:   boolean_cleanup.New(factory, functionContext),
 	}
 }
+
+// Returns the immutable scalar-analysis service.
+func (r *Engine) Extractor() *fact_extraction.ScalarExtractor { return r.extractor }

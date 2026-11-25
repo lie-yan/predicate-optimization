@@ -56,14 +56,12 @@ func (p OccurrencePath) Resolve(source expressions.Expression) (expressions.Expr
 // RewriteAttempt owns one conditional restriction under a retained guard.
 // Constructed records are read-only; source expressions and analysis data are shared.
 type RewriteAttempt struct {
-	// original retains the constructor-established associations, not cached analysis.
-	original *RewriteAttempt
-	Rule     *Engine                        // Engine whose analysis and eligibility contracts apply.
-	Source   *expressions.LogicalExpression // Original AND region for this attempt.
-	Scope    *scoped_reasoning.Scope        // Fresh identity for this attempt's assumptions.
-	Guard    GuardCandidate                 // Selected occurrence with an independently owned path.
-	Premise  *scoped_reasoning.Premise      // The single retained occurrence justifying the restriction.
-	Input    *scoped_reasoning.InputDomain  // Proper nonempty restriction conditional on that premise.
+	rule    *Engine                        // Engine whose analysis and eligibility contracts apply.
+	source  *expressions.LogicalExpression // Original AND region for this attempt.
+	scope   *scoped_reasoning.Scope        // Fresh identity for this attempt's assumptions.
+	guard   GuardCandidate                 // Selected occurrence with an independently owned path.
+	premise *scoped_reasoning.Premise      // The single retained occurrence justifying the restriction.
+	input   *scoped_reasoning.InputDomain  // Proper nonempty restriction conditional on that premise.
 }
 
 // RewriteContext locates a visit within the attempt's original source snapshot.
@@ -103,8 +101,8 @@ func (r *Engine) NewAttempt(source *expressions.LogicalExpression, guard GuardCa
 	if err != nil {
 		return absent, err
 	}
-	facts := scoped_reasoning.NewScopedFactContext()
-	scope := facts.NewScope()
+
+	scope := scoped_reasoning.NewScope()
 	input, err := scoped_reasoning.NewInputDomain(scope, operand, universe, operand.Type().Nullability() == foundation.MayNull, nil)
 	if err != nil {
 		return absent, err
@@ -114,7 +112,7 @@ func (r *Engine) NewAttempt(source *expressions.LogicalExpression, guard GuardCa
 	// object and path. Only this guard becomes a dependency of the restriction.
 	// In the example, {1, 2} is conditional on this particular IN occurrence;
 	// retrying the same guard creates fresh identities rather than reusing proof state.
-	premise, err := facts.RegisterPremise(scope, guard.Expression)
+	premise, err := scope.RegisterPremise(guard.Expression)
 	if err != nil {
 		return absent, err
 	}
@@ -141,9 +139,28 @@ func (r *Engine) NewAttempt(source *expressions.LogicalExpression, guard GuardCa
 	}
 
 	guard.Path = guard.Path.Clone()
-	attempt := &RewriteAttempt{Rule: r, Source: source, Scope: scope, Guard: guard, Premise: premise, Input: restricted}
-	original := *attempt
-	original.Guard.Path = guard.Path.Clone()
-	attempt.original = &original
+	attempt := &RewriteAttempt{rule: r, source: source, scope: scope, guard: guard, premise: premise, input: restricted}
 	return foundation.Some(attempt), nil
 }
+
+// Returns the shared immutable analysis services.
+func (a *RewriteAttempt) Rule() *Engine { return a.rule }
+
+// Returns the original AND region.
+func (a *RewriteAttempt) Source() *expressions.LogicalExpression { return a.source }
+
+// Returns the scope of this attempt's assumptions.
+func (a *RewriteAttempt) Scope() *scoped_reasoning.Scope { return a.scope }
+
+// Copies the guard path while sharing immutable expression and summary data.
+func (a *RewriteAttempt) Guard() GuardCandidate {
+	g := a.guard
+	g.Path = g.Path.Clone()
+	return g
+}
+
+// Returns the retained guard occurrence.
+func (a *RewriteAttempt) Premise() *scoped_reasoning.Premise { return a.premise }
+
+// Returns the immutable guard-derived input domain.
+func (a *RewriteAttempt) Input() *scoped_reasoning.InputDomain { return a.input }

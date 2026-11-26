@@ -193,9 +193,9 @@ func TestWrappedHandleContextPairing(t *testing.T) {
 	if !must(first.IsArithmeticFunction(arithmetic)) || !must(first.IsComparisonFunction(comparison)) {
 		t.Fatal("wrapped operator lookup/classification failed")
 	}
-	args := handle.ArgumentTypes()
+	args := handle.Signature().ArgumentTypes()
 	args[0] = f.integer
-	if !handle.ArgumentTypes()[0].EqualsTo(f.array) || handle.Namespace() == "" {
+	if !handle.Signature().ArgumentTypes()[0].EqualsTo(f.array) || handle.Namespace() == "" {
 		t.Fatal("wrapper getter ownership changed")
 	}
 	other := must(second.LookupBuiltInFunction(functions.BuiltInArrayContains, []types.Type{f.array, f.integer}))

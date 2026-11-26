@@ -24,13 +24,13 @@ func (c *metadataReadContext) Metadata(functioninterfaces.FunctionHandle) (*func
 
 type metadataReadHandle struct {
 	functioninterfaces.FunctionHandle
-	arguments []types.Type
+	signature *functions.FunctionSignature
 	reads     int
 }
 
-func (h *metadataReadHandle) ArgumentTypes() []types.Type {
+func (h *metadataReadHandle) Signature() *functions.FunctionSignature {
 	h.reads++
-	return append([]types.Type(nil), h.arguments...)
+	return h.signature
 }
 
 var (
@@ -53,7 +53,7 @@ func BenchmarkMetadataInspection(b *testing.B) {
 			metadata := inspectionMetadata(args)
 			b.Run(fmt.Sprintf("%s/Arity%d", name, arity), func(b *testing.B) {
 				context := &metadataReadContext{metadata: metadata}
-				handle := &metadataReadHandle{arguments: args}
+				handle := &metadataReadHandle{signature: metadata.Signature()}
 				if got, err := utils.InspectFunction(context, handle); err != nil || got != metadata {
 					b.Fatal("invalid fixture", err)
 				}

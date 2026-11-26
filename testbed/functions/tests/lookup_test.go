@@ -71,7 +71,7 @@ func TestBuiltInLookupForTouchstone(t *testing.T) {
 		if err != nil || metadata != tc.metadata {
 			t.Fatalf("handle not paired with context: %v", err)
 		}
-		if handle.ArgumentTypes()[0].Nullability() != foundation.NonNull {
+		if handle.Signature().ArgumentTypes()[0].Nullability() != foundation.NonNull {
 			t.Fatal("handle must expose implementation types")
 		}
 		bound, err := shared.BindFunctionSignature(metadata, tc.args)

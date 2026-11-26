@@ -1,6 +1,6 @@
 package interfaces
 
-import "github.com/lie-yan/predicate-optimization/types"
+import "github.com/lie-yan/predicate-optimization/functions"
 
 // FunctionHandle identifies a resolved function in a matching caller-supplied
 // context. Its concrete representation belongs to the caller. Handles must be
@@ -17,10 +17,10 @@ type FunctionHandle interface {
 	Namespace() string
 	// Name returns the resolved function name, not diagnostic display text.
 	Name() string
-	// ArgumentTypes returns a copy of the ordered implementation parameter
-	// types. Immutable Type descriptors may be shared. These types agree with
-	// metadata and may differ from a Call's effective argument types.
-	ArgumentTypes() []types.Type
+	// Signature returns the shared immutable implementation signature, not a
+	// call's effective signature after nullability adaptation. It must be non-nil
+	// and stable, with parameter Types consistent with context metadata.
+	Signature() *functions.FunctionSignature
 	// EqualsTo compares complete resolved identity, including signature and
 	// any version or context identity needed to distinguish semantics. Names,
 	// argument types and pointer identity alone need not establish equality.

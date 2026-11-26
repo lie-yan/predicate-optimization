@@ -31,7 +31,7 @@ type validationHandle struct{}
 
 func (validationHandle) Namespace() string                               { return "test" }
 func (validationHandle) Name() string                                    { return "test" }
-func (validationHandle) ArgumentTypes() []types.Type                     { return nil }
+func (validationHandle) Signature() *functions.FunctionSignature         { return nil }
 func (validationHandle) EqualsTo(functioninterfaces.FunctionHandle) bool { return true }
 
 func MalformedCallsForValidationTest() []Expression {

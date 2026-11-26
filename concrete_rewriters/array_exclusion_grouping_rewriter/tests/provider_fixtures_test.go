@@ -59,9 +59,9 @@ type wrappedHandle struct {
 	delegate []functioninterfaces.FunctionHandle // Exactly one immutable handle.
 }
 
-func (h wrappedHandle) Namespace() string           { return h.delegate[0].Namespace() }
-func (h wrappedHandle) Name() string                { return h.delegate[0].Name() }
-func (h wrappedHandle) ArgumentTypes() []types.Type { return h.delegate[0].ArgumentTypes() }
+func (h wrappedHandle) Namespace() string                       { return h.delegate[0].Namespace() }
+func (h wrappedHandle) Name() string                            { return h.delegate[0].Name() }
+func (h wrappedHandle) Signature() *functions.FunctionSignature { return h.delegate[0].Signature() }
 func (h wrappedHandle) EqualsTo(other functioninterfaces.FunctionHandle) bool {
 	o, ok := other.(wrappedHandle)
 	return ok && h.owner == o.owner && h.delegate[0].EqualsTo(o.delegate[0])

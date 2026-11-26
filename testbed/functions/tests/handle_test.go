@@ -57,13 +57,13 @@ func TestCatalogCanonicalizationAndEquality(t *testing.T) {
 	}
 	definitions[0].Name = "changed"
 	handles[0] = nil
-	arguments := a.ArgumentTypes()
+	arguments := a.Signature().ArgumentTypes()
 	originalType := first.Metadata.Signature().ArgumentTypes()[0]
 	if arguments[0] != originalType {
 		t.Fatal("immutable type descriptor was not shared")
 	}
 	arguments[0] = nil
-	if a.Name() != "identity" || a.Namespace() != "fixture" || a.ArgumentTypes()[0] != originalType || !a.EqualsTo(catalog.Handles()[0]) {
+	if a.Name() != "identity" || a.Namespace() != "fixture" || a.Signature().ArgumentTypes()[0] != originalType || !a.EqualsTo(catalog.Handles()[0]) {
 		t.Fatal("caller-owned slice mutation changed catalog state")
 	}
 }

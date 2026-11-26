@@ -21,9 +21,9 @@ type cleanupObservedHandle struct {
 	argumentQueries int
 }
 
-func (h *cleanupObservedHandle) ArgumentTypes() []types.Type {
+func (h *cleanupObservedHandle) Signature() *functions.FunctionSignature {
 	h.argumentQueries++
-	return h.FunctionHandle.ArgumentTypes()
+	return h.FunctionHandle.Signature()
 }
 
 func (h *cleanupObservedHandle) EqualsTo(other functioninterfaces.FunctionHandle) bool {

@@ -30,12 +30,19 @@ func InspectFunction(context functioninterfaces.FunctionContext, handle function
 	if metadata == nil {
 		return nil, fmt.Errorf("%w: missing function metadata", functions.ErrContractViolation)
 	}
-	arguments := handle.ArgumentTypes()
 	signature := metadata.Signature()
-	if len(arguments) != signature.ArgumentCount() {
+	implementation := handle.Signature()
+	if implementation == nil {
+		return nil, fmt.Errorf("%w: missing handle signature", functions.ErrContractViolation)
+	}
+	if implementation == signature {
+		return metadata, nil
+	}
+	if implementation.ArgumentCount() != signature.ArgumentCount() {
 		return nil, fmt.Errorf("%w: handle/metadata arity mismatch", functions.ErrContractViolation)
 	}
-	for i, argument := range arguments {
+	for i := 0; i < implementation.ArgumentCount(); i++ {
+		argument := implementation.ArgumentTypeAt(i)
 		if assertions.IsNil(argument) || !argument.EqualsTo(signature.ArgumentTypeAt(i)) {
 			return nil, fmt.Errorf("%w: handle/metadata argument %d mismatch", functions.ErrContractViolation, i)
 		}

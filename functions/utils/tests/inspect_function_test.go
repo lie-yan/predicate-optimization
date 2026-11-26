@@ -3,7 +3,6 @@ package utils_test
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"testing"
 
 	"github.com/lie-yan/predicate-optimization/foundation"
@@ -42,19 +41,16 @@ func (c *inspectionContext) Metadata(handle functioninterfaces.FunctionHandle) (
 	return c.metadata, c.failure
 }
 
-// A slice makes the value handle non-comparable. Full identity belongs to its
-// owner; neither pointer identity nor a Go map key is required by inspection.
+// Full identity belongs to the paired provider.
 type inspectionHandle struct {
 	owner     *inspectionContext
 	id        int
-	arguments []types.Type
+	signature *functions.FunctionSignature
 }
 
-func (h inspectionHandle) Namespace() string { return "inspection" }
-func (h inspectionHandle) Name() string      { return "custom" }
-func (h inspectionHandle) ArgumentTypes() []types.Type {
-	return append([]types.Type(nil), h.arguments...)
-}
+func (h inspectionHandle) Namespace() string                       { return "inspection" }
+func (h inspectionHandle) Name() string                            { return "custom" }
+func (h inspectionHandle) Signature() *functions.FunctionSignature { return h.signature }
 
 func (h inspectionHandle) EqualsTo(other functioninterfaces.FunctionHandle) bool {
 	o, ok := other.(inspectionHandle)
@@ -89,10 +85,7 @@ func TestInspectFunctionAcceptsValidMetadata(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			metadata := inspectionMetadata(tc.arguments)
 			context := &inspectionContext{metadata: metadata}
-			handle := inspectionHandle{context, 1, tc.arguments}
-			if reflect.TypeOf(handle).Comparable() {
-				t.Fatal("fixture should use a non-comparable handle")
-			}
+			handle := inspectionHandle{context, 1, metadata.Signature()}
 			for range 2 {
 				got, err := utils.InspectFunction(context, handle)
 				if err != nil || got != metadata {
@@ -103,7 +96,7 @@ func TestInspectFunctionAcceptsValidMetadata(t *testing.T) {
 				t.Fatal("inspection should query once per call without caching")
 			}
 			for i, argument := range tc.arguments {
-				if argument != handle.arguments[i] || !argument.EqualsTo(metadata.Signature().ArgumentTypes()[i]) {
+				if argument != handle.Signature().ArgumentTypeAt(i) || !argument.EqualsTo(metadata.Signature().ArgumentTypes()[i]) {
 					t.Fatal("inspection mutated signature inputs")
 				}
 			}
@@ -120,15 +113,12 @@ func TestInspectFunctionChecksCompleteImplementationTypes(t *testing.T) {
 	text16 := must(types.NewVarCharType(&bound16, foundation.NonNull))
 	array := must(types.NewArrayType(integer, foundation.NonNull))
 	nullableElements := must(types.NewArrayType(nullable, foundation.NonNull))
-	var typedNil *types.IntType
 	for _, tc := range []struct {
 		name       string
 		arguments  []types.Type
 		parameters []types.Type
 	}{
 		{"arity", nil, []types.Type{integer}},
-		{"nil argument", []types.Type{nil}, []types.Type{integer}},
-		{"typed nil argument", []types.Type{typedNil}, []types.Type{integer}},
 		{"integer width", []types.Type{width}, []types.Type{integer}},
 		{"outer nullability", []types.Type{nullable}, []types.Type{integer}},
 		{"varchar bound", []types.Type{text8}, []types.Type{text16}},
@@ -136,7 +126,7 @@ func TestInspectFunctionChecksCompleteImplementationTypes(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			context := &inspectionContext{metadata: inspectionMetadata(tc.parameters)}
-			handle := inspectionHandle{context, 1, tc.arguments}
+			handle := inspectionHandle{context, 1, inspectionMetadata(tc.arguments).Signature()}
 			got, err := utils.InspectFunction(context, handle)
 			if got != nil || !errors.Is(err, functions.ErrContractViolation) || context.queries != 1 {
 				t.Fatalf("expected checked inconsistency, got %v", err)
@@ -158,7 +148,7 @@ func TestInspectFunctionRejectsMissingHandleOrMetadata(t *testing.T) {
 	// exactly nil here; it cannot be hidden inside a non-nil interface.
 	var typedNilMetadata *functions.FunctionMetadata
 	context := &inspectionContext{metadata: typedNilMetadata}
-	got, err := utils.InspectFunction(context, inspectionHandle{owner: context, id: 1})
+	got, err := utils.InspectFunction(context, inspectionHandle{owner: context, id: 1, signature: inspectionMetadata(nil).Signature()})
 	if got != nil || !errors.Is(err, functions.ErrContractViolation) || context.queries != 1 {
 		t.Fatalf("expected missing metadata failure: %v", err)
 	}
@@ -174,7 +164,7 @@ func TestInspectFunctionPreservesProviderFailuresAndRetry(t *testing.T) {
 		t.Run(cause.Error(), func(t *testing.T) {
 			// Even a provider returning metadata alongside an error has failed.
 			context := &inspectionContext{metadata: inspectionMetadata(nil), failure: cause}
-			handle := inspectionHandle{owner: context, id: 1}
+			handle := inspectionHandle{owner: context, id: 1, signature: inspectionMetadata(nil).Signature()}
 			got, err := utils.InspectFunction(context, handle)
 			if got != nil || !errors.Is(err, cause) {
 				t.Fatalf("provider cause lost: %v", err)
@@ -216,5 +206,19 @@ func TestInspectFunctionUsesPairedContext(t *testing.T) {
 	foreign := must(testbed.NewStandardContext())
 	if got, err := utils.InspectFunction(foreign, handle); got != nil || !errors.Is(err, functions.ErrIncompatibleHandle) {
 		t.Fatalf("foreign catalog accepted: %v", err)
+	}
+}
+
+func TestInspectFunctionDistinctAndMissingSignature(t *testing.T) {
+	integer := must(types.NewIntType(types.Int64, foundation.NonNull))
+	metadata := inspectionMetadata([]types.Type{integer})
+	context := &inspectionContext{metadata: metadata}
+	handle := inspectionHandle{owner: context, id: 1, signature: inspectionMetadata([]types.Type{integer}).Signature()}
+	if got, err := utils.InspectFunction(context, handle); err != nil || got != metadata {
+		t.Fatalf("distinct equal signature: %v", err)
+	}
+	handle.signature = nil
+	if _, err := utils.InspectFunction(context, handle); !errors.Is(err, functions.ErrContractViolation) {
+		t.Fatalf("missing signature: %v", err)
 	}
 }

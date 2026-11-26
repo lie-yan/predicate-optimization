@@ -138,3 +138,27 @@ func TestCallExpressionInvalidBindings(t *testing.T) {
 		}()
 	}
 }
+
+func TestCallExactSignatureAndRebinding(t *testing.T) {
+	provider := fixture(testbed.NewStandardContext())
+	integer := fixture(types.NewIntType(types.Int64, foundation.NonNull))
+	nullable := fixture(integer.WithNullability(foundation.MayNull))
+	ref := fixture(expressions.NewReferenceExpression(fixture(columns.NewColumnID("table", "x")), integer, "x"))
+	handle := fixture(provider.ArithmeticFunction(foundation.Add, []types.Type{integer, integer}))
+	call := fixture(expressions.NewCallExpression(provider, handle, []expressions.Expression{ref, ref}))
+	metadata := fixture(provider.Metadata(handle))
+	if call.Signature() != metadata.Signature() {
+		t.Fatal("exact call should share implementation signature")
+	}
+	nullableRef := fixture(expressions.NewReferenceExpression(ref.ID(), nullable, "x"))
+	rebuilt := fixture(expressions.NewCallExpression(provider, handle, []expressions.Expression{nullableRef, ref}))
+	if rebuilt.Signature() == metadata.Signature() || rebuilt.Type().Nullability() != foundation.MayNull {
+		t.Fatal("nullable call must adapt the signature")
+	}
+	// Reconstruction must not reuse the original exact signature for changed operands.
+	boolean := fixture(types.NewBoolType(foundation.NonNull))
+	wrong := fixture(expressions.NewLiteralExpression(fixture(testbedvalues.NewBool(boolean, true))))
+	if _, err := call.WithChildren([]expressions.Expression{wrong, ref}); !errors.Is(err, functions.ErrUnsupportedLookup) {
+		t.Fatalf("changed argument accepted: %v", err)
+	}
+}

@@ -8,6 +8,7 @@ import (
 	functionutils "github.com/lie-yan/predicate-optimization/functions/utils"
 	"github.com/lie-yan/predicate-optimization/internal/assertions"
 
+	"github.com/lie-yan/predicate-optimization/foundation"
 	"github.com/lie-yan/predicate-optimization/functions"
 	"github.com/lie-yan/predicate-optimization/types"
 )
@@ -28,21 +29,34 @@ var _ Expression = (*CallExpression)(nil)
 // immutable expressions. Nil context, handle or children assert. Binding and
 // context errors are returned with their categories preserved. Construction
 // establishes local call validity, not graph-wide identity consistency or equivalence.
+// Exact non-null arguments reuse the implementation signature; other arguments
+// use the binder for compatibility checks and nullable adaptation.
 func NewCallExpression(context functioninterfaces.FunctionContext, handle functioninterfaces.FunctionHandle, arguments []Expression) (*CallExpression, error) {
 	assertions.NotNil(context)
 	assertions.NotNil(handle)
-	argumentTypes := make([]types.Type, len(arguments))
-	for i, argument := range arguments {
-		assertions.NotNil(argument)
-		argumentTypes[i] = argument.Type()
-	}
 	metadata, err := functionutils.InspectFunction(context, handle)
 	if err != nil {
 		return nil, fmt.Errorf("call metadata: %w", err)
 	}
-	signature, err := functions.BindFunctionSignature(metadata, argumentTypes)
-	if err != nil {
-		return nil, fmt.Errorf("call binding: %w", err)
+	signature := metadata.Signature()
+	exact := len(arguments) == signature.ArgumentCount()
+	for i, argument := range arguments {
+		assertions.NotNil(argument)
+		if exact {
+			typ := argument.Type()
+			exact = typ.Nullability() == foundation.NonNull && typ.EqualsTo(signature.ArgumentTypeAt(i))
+		}
+	}
+	// Exact non-null arguments need no null-policy adaptation or signature binding.
+	if !exact {
+		argumentTypes := make([]types.Type, len(arguments))
+		for i, argument := range arguments {
+			argumentTypes[i] = argument.Type()
+		}
+		signature, err = functions.BindFunctionSignature(metadata, argumentTypes)
+		if err != nil {
+			return nil, fmt.Errorf("call binding: %w", err)
+		}
 	}
 	return &CallExpression{context: context, handle: handle, signature: signature, arguments: append([]Expression(nil), arguments...)}, nil
 }

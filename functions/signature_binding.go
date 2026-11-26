@@ -13,10 +13,25 @@ import (
 // Inputs must be valid and non-nil; nil inputs trigger assertions.
 // Incompatible arity/types and nullable arguments with unspecified null handling
 // return ErrUnsupportedLookup. No independent null-handling contract is assumed.
+// Exact bindings share the immutable implementation signature; adapted bindings
+// retain a private copy of the effective argument slice.
 func BindFunctionSignature(metadata *FunctionMetadata, argumentTypes []types.Type) (*FunctionSignature, error) {
 	resultType, err := bindResultType(metadata, argumentTypes)
 	if err != nil {
 		return nil, err
+	}
+	implementation := metadata.signature
+	if resultType.EqualsTo(implementation.resultType) {
+		exact := true
+		for i, argument := range argumentTypes {
+			if !argument.EqualsTo(implementation.argumentTypes[i]) {
+				exact = false
+				break
+			}
+		}
+		if exact {
+			return implementation, nil
+		}
 	}
 	return NewFunctionSignature(argumentTypes, resultType)
 }

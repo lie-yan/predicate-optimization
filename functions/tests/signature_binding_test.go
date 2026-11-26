@@ -66,6 +66,13 @@ func TestBindFunctionSignatureNullPolicies(t *testing.T) {
 			if !signature.ResultType().EqualsTo(tc.want) {
 				t.Fatalf("got %s, want %s", signature.ResultType(), tc.want)
 			}
+			exact := tc.result.EqualsTo(tc.want)
+			for i, argument := range tc.args {
+				exact = exact && argument.EqualsTo(tc.params[i])
+			}
+			if (signature == metadata.Signature()) != exact {
+				t.Fatal("only exact bindings should reuse the implementation signature")
+			}
 			for i, argument := range signature.ArgumentTypes() {
 				if argument != tc.args[i] {
 					t.Fatal("effective argument descriptors should be retained")
@@ -78,6 +85,23 @@ func TestBindFunctionSignatureNullPolicies(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+func TestExactBindingSharesSignatureWithoutBorrowingInputSlice(t *testing.T) {
+	parameter := bindingInt(t, types.Int64, foundation.NonNull)
+	argument := bindingInt(t, types.Int64, foundation.NonNull)
+	metadata := bindingMetadata(t, []types.Type{parameter}, parameter, []functions.NullPolicy{functions.PropagateNull})
+	args := []types.Type{argument}
+	signature, err := functions.BindFunctionSignature(metadata, args)
+	if err != nil || signature != metadata.Signature() {
+		t.Fatalf("equal independently constructed Types should reuse the signature: %v", err)
+	}
+	args[0] = bindingInt(t, types.Int8, foundation.NonNull)
+	returned := signature.ArgumentTypes()
+	returned[0] = args[0]
+	if signature.ArgumentTypeAt(0) != parameter {
+		t.Fatal("caller mutation changed shared implementation metadata")
 	}
 }
 

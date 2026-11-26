@@ -15,6 +15,8 @@ type TypePattern interface {
 	// Returns the literal parameter names referenced by this pattern in a fresh slice.
 	Parameters() []string
 	equalPattern(TypePattern, map[string]string, map[string]string) bool
+	bindPattern(Type, map[string]literalBinding) bool
+	resolvePattern(map[string]literalBinding) (Type, error)
 }
 
 // Fixed declaration domain sharing an immutable concrete Type, including its nullability.

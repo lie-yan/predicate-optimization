@@ -48,7 +48,7 @@ func TestScopedProofFactoryForwarding(t *testing.T) {
 	if !present || factory.boolCalls != 2 {
 		t.Fatalf("proof construction/validation bypassed factory: %d", factory.boolCalls)
 	}
-	value := result.Expression.(*expressions.LiteralExpression).Value()
+	value := result.Expression().(*expressions.LiteralExpression).Value()
 	if _, ok := value.(fixtures.ScalarView); !ok || value.(valueinterfaces.BoolValue).Bool() || !value.Type().EqualsTo(target.Type()) {
 		t.Fatal("lost external proof result")
 	}
@@ -69,7 +69,7 @@ func TestScopedProofFactoryForwarding(t *testing.T) {
 		t.Fatal("engine extractor lost factory")
 	}
 	factory.Requests = nil
-	must(ranged.Input.PossibleValues().Complement())
+	must(ranged.Input().PossibleValues().Complement())
 	if len(factory.Requests) == 0 {
 		t.Fatal("scoped input domain lost factory")
 	}

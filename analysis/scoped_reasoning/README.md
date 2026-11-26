@@ -8,8 +8,7 @@ The package comment and exported declarations provide Go API documentation. This
 
 | Type | Meaning | Current responsibility |
 | --- | --- | --- |
-| `ScopedFactContext` | Owner of a collection of identities | Creates scopes and registers premise occurrences. |
-| `Scope` | Identity of one reasoning context | Separates assumptions used in different contexts. |
+| `Scope` | Identity of one reasoning context | Separates assumptions and registers premise occurrences. |
 | `Premise` | Identity of a retained Boolean expression occurrence | Records the expression and its scope. |
 | `InputDomain` | Possible inputs under specified assumptions | Carries values, null possibility and premise dependencies. |
 | `ScopedConclusion` | Evidence relative to an input domain | Records uniform truth, a conditional restriction or unreachable inputs, with dependencies. |
@@ -20,13 +19,11 @@ flowchart BT
     P["<b>Premise</b><br/>One retained occurrence"]
     E["<b>Expression</b><br/>Immutable Boolean expression"]
     S["<b>Scope</b><br/>Where assumptions apply"]
-    C["<b>ScopedFactContext</b><br/>Identity owner"]
 
     D -->|depends on| P
     D -->|applies in| S
     P -->|identifies an occurrence of| E
     P -->|belongs to| S
-    S -->|owned by| C
 ```
 
 ## Scope: where a restriction applies
@@ -116,14 +113,14 @@ The package functions in [queries.go](queries.go) consume an exact `facts.Predic
 | `ProveTruth(summary, input)` | Does this predicate have a uniform result over the possible inputs? | All input premises. |
 | `RestrictToTrue(summary, input, condition)` | Which possible inputs remain if this predicate is required to be true? | All input premises plus the condition occurrence. |
 
-Both return `(foundation.Optional[ScopedConclusion], error)`. There are four distinct situations:
+`ProveTruth` returns `(foundation.Optional[ScopedConclusion], error)`; `RestrictToTrue` returns `(ScopedConclusion, error)`. There are four distinct situations:
 
 - A present `KnownTruth(Null)` means the predicate result is known to be SQL NULL.
 - An absent conclusion with no error means ProveTruth established no uniform truth over the supplied inputs.
-- A present `Unreachable` means no inputs remain possible under the dependencies.
+- An `Unreachable` conclusion means no inputs remain possible under the dependencies.
 - An error means the operation failed, including an unsupported exact set operation.
 
-RestrictToTrue always returns a present conclusion on success. These functions use explicit arguments; they need no mutable fact registry or evaluation context.
+`RestrictToTrue` returns a conclusion directly on success: `RestrictedDomain` or `Unreachable`. These functions use explicit arguments; they need no mutable fact registry or evaluation context.
 
 ### ProveTruth: test whether every possible input agrees
 
@@ -277,14 +274,13 @@ import (
 )
 
 func distinctOccurrences(expr expressions.Expression) (bool, error) {
-	facts := scoped.NewScopedFactContext()
-	scope := facts.NewScope()
+	scope := scoped.NewScope()
 
-	first, err := facts.RegisterPremise(scope, expr)
+	first, err := scope.RegisterPremise(expr)
 	if err != nil {
 		return false, err
 	}
-	second, err := facts.RegisterPremise(scope, expr)
+	second, err := scope.RegisterPremise(expr)
 	if err != nil {
 		return false, err
 	}
@@ -295,16 +291,16 @@ func distinctOccurrences(expr expressions.Expression) (bool, error) {
 
 The caller associates registrations with actual occurrences; registration does not traverse the tree or discover their positions. When referring again to an already registered occurrence, reuse its token. Copying a `Scope` or `Premise` struct also preserves identity because the copy points to the same private identity record. Compare tokens through `EqualsTo`; comparing wrapper pointers would distinguish such copies.
 
-## Context ownership and identity implementation
+## Scope ownership and identity implementation
 
-`ScopedFactContext` currently holds only an identity. It creates tokens and checks ownership; it has no searchable fact registry and does not evaluate expressions. A context rejects registration into a scope created by another context. `InputDomain` likewise rejects premise dependencies from another scope.
+Each `Scope` registers its own premise occurrences. `InputDomain` rejects premise dependencies from another scope; no separate context owner or fact registry is needed.
 
-The private records in [premise.go](premise.go) and [scoped_fact_context.go](scoped_fact_context.go) make identity checks simple pointer comparisons. They avoid requiring expressions or caller-provided column IDs to be comparable Go map keys. The `marker byte` makes the context identity allocation nonzero-sized: Go permits pointers to distinct zero-sized variables to compare equal.
+The private records in [premise.go](premise.go) and [scope.go](scope.go) make identity checks simple pointer comparisons. They avoid requiring expressions or caller-provided column IDs to be comparable Go map keys. The `marker byte` makes the scope identity allocation nonzero-sized: Go permits pointers to distinct zero-sized variables to compare equal.
 
 Tokens are shared as immutable objects. Their identity is independent of expression equality and value-set compatibility. `InputDomain` copies its dependency slice, deduplicates entries by premise identity in first-occurrence order and returns a fresh slice from `Premises()`.
 
 ## Construction contracts and proof responsibility
 
-Use the constructors to obtain contexts and domains, `NewScope` to obtain scopes, and `RegisterPremise` to obtain premises. Their zero values are invalid. Required nil inputs and unconstructed tokens trigger assertions; incompatible non-nil inputs return errors. For example, registering a non-Boolean expression or using a foreign scope returns an error.
+Use the constructors to obtain domains, `NewScope` to obtain scopes, and `RegisterPremise` to obtain premises. Their zero values are invalid. Required nil inputs and unconstructed tokens trigger assertions; incompatible non-nil inputs return errors. For example, registering a non-Boolean expression or using a premise from another scope returns an error.
 
 Successful registration of `x < 10` does not prove it or derive a range automatically. The caller establishes the restriction, supplies its complete premise dependencies and retains the supporting occurrences when applying a conclusion. An empty dependency list can represent independently established inputs, but does not itself prove the supplied restriction. Callers must preserve scope and dependency validity; registration alone does not establish those proofs.

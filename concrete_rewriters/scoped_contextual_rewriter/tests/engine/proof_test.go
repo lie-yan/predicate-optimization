@@ -7,8 +7,6 @@ import (
 	"github.com/lie-yan/predicate-optimization/concrete_rewriters/internal/boolean_cleanup"
 
 	"github.com/lie-yan/predicate-optimization/analysis/facts"
-	"github.com/lie-yan/predicate-optimization/analysis/scoped_reasoning"
-	"github.com/lie-yan/predicate-optimization/analysis/value_set"
 	"github.com/lie-yan/predicate-optimization/concrete_rewriters/scoped_contextual_rewriter/internal/engine"
 
 	finite "github.com/lie-yan/predicate-optimization/analysis/value_set/equatable_value_set"
@@ -56,12 +54,12 @@ func TestProveLiteralFiniteAndRangeTargets(t *testing.T) {
 				t.Fatal("expected proved literal")
 			}
 			expected := must(boolean_cleanup.TruthLiteral(testbedvalues.ValueFactory{}, target.Type().(*types.BoolType), tc.want))
-			if !result.Expression.EqualsTo(expected) || result.Expression.Type() != target.Type() || len(result.Steps) != 1 {
+			if !result.Expression().EqualsTo(expected) || result.Expression().Type() != target.Type() || len(result.Steps()) != 1 {
 				t.Fatal("wrong literal, original Type or evidence count")
 			}
-			step := result.Steps[0]
+			step := result.Steps()[0]
 			proof, hasProof := step.Conclusion.Get()
-			if !hasProof || proof.Summary().Source() != target || proof.InputDomain() != attempt.Input || step.Source != target || step.Before != target || step.After != result.Expression || !step.Path.EqualsTo(engine.OccurrencePath{1}) || !proof.Premises()[0].EqualsTo(attempt.Premise) {
+			if !hasProof || proof.Summary().Source() != target || proof.InputDomain() != attempt.Input() || step.Source != target || step.Before != target || step.After != result.Expression() || !step.Path.EqualsTo(engine.OccurrencePath{1}) || !proof.Premises()[0].EqualsTo(attempt.Premise()) {
 				t.Fatal("proof lost source/domain/dependency association")
 			}
 			// Independent execution is only an oracle: the optimization provider's
@@ -73,7 +71,7 @@ func TestProveLiteralFiniteAndRangeTargets(t *testing.T) {
 			}
 			oracleTarget := guardComparison(provider.FunctionContext, tc.op, x, tc.n)
 			oracleSource := guardLogical(foundation.And, oracleGuard, oracleTarget)
-			candidate := guardLogical(foundation.And, oracleGuard, result.Expression)
+			candidate := guardLogical(foundation.And, oracleGuard, result.Expression())
 			for _, n := range []int64{-1, 0, 1, 2, 3, 9, 10, 20, 21} {
 				env := changedChildrenEnvironment{value: guardInteger(n).Value()}
 				got := must(evaluator.Evaluate(candidate, env))
@@ -118,19 +116,14 @@ func TestProveLiteralAbsenceAndAssociation(t *testing.T) {
 	}{
 		{engine.RewriteContext{Attempt: attempt, Path: engine.OccurrencePath{1}}, equalButDistinct},
 		{engine.RewriteContext{Attempt: attempt, Path: engine.OccurrencePath{99}}, unknown},
-		{engine.RewriteContext{Attempt: requireAttempt(t, rule, source, attempt.Guard), Path: engine.OccurrencePath{1}}, unknown},
+		{engine.RewriteContext{Attempt: requireAttempt(t, rule, source, attempt.Guard()), Path: engine.OccurrencePath{1}}, unknown},
 	} {
 		result, err := attempt.ProveLiteral(tc.node, tc.context)
 		if _, present := result.Get(); present || !errors.Is(err, rewriter.ErrInvalidReplacement) {
 			t.Fatal("invalid association did not fail", err)
 		}
 	}
-	// Empty inputs are a private query fixture; NewAttempt itself rejects them.
-	empty := must(finite.NewEquatableValueSet(testbedvalues.ValueFactory{}, typ, nil))
-	attempt.Input = must(scoped_reasoning.NewInputDomain(attempt.Scope, x, empty, false, []*scoped_reasoning.Premise{attempt.Premise}))
-	if _, present := must(attempt.ProveLiteral(unknown, engine.RewriteContext{Attempt: attempt, Path: engine.OccurrencePath{1}})).Get(); present {
-		t.Fatal("Unreachable became a truth literal")
-	}
+
 }
 
 func TestProveLiteralPreservesNullableTypeAndKnownNull(t *testing.T) {
@@ -156,41 +149,30 @@ func TestProveLiteralPreservesNullableTypeAndKnownNull(t *testing.T) {
 		summary := must(facts.NewPredicateSummary(x, set, foundation.Some(nullTruth), guard))
 		attempt := requireAttempt(t, rule, source, engine.GuardCandidate{Path: engine.OccurrencePath{0}, Expression: guard, Summary: summary})
 		result, present := must(attempt.ProveLiteral(target, engine.RewriteContext{Attempt: attempt, Path: engine.OccurrencePath{1}})).Get()
-		if !present || result.Expression.Type() != target.Type() || !result.Expression.EqualsTo(must(boolean_cleanup.TruthLiteral(testbedvalues.ValueFactory{}, target.Type().(*types.BoolType), want))) {
+		if !present || result.Expression().Type() != target.Type() || !result.Expression().EqualsTo(must(boolean_cleanup.TruthLiteral(testbedvalues.ValueFactory{}, target.Type().(*types.BoolType), want))) {
 			t.Fatal("nullable truth substitution lost its declared Type or payload")
 		}
 	}
 }
 
-type proofFailureSet struct {
-	value_set.ValueSet
-	err error
-}
-
-func (s proofFailureSet) IsSubsetOf(value_set.ValueSet) (bool, error) { return false, s.err }
-
 func TestProveLiteralErrorsAndOmissionAdmission(t *testing.T) {
-	for _, stage := range []string{"extraction", "query", "omission error", "omission refusal"} {
+	for _, stage := range []string{"extraction", "omission error", "omission refusal"} {
 		t.Run(stage, func(t *testing.T) {
 			a, target, _ := stepFixture(t)
 			provider := target.Context().(*membershipEligibilityContext)
 			sentinel := errors.New("injected proof failure")
 			provider.queries = 0
-			if stage == "query" {
-				a.Input = must(scoped_reasoning.NewInputDomain(a.Scope, a.Input.Operand(), proofFailureSet{ValueSet: a.Input.PossibleValues(), err: sentinel}, false, []*scoped_reasoning.Premise{a.Premise}))
-			} else {
-				// Deliberately vary inspection responses after valid construction to
-				// isolate omission handling; this is not a conforming stable provider.
-				provider.metadata = func(handle functioninterfaces.FunctionHandle) (*functions.FunctionMetadata, error) {
-					if stage == "extraction" || provider.queries == 2 && stage == "omission error" {
-						return nil, sentinel
-					}
-					metadata, err := provider.FunctionContext.Metadata(handle)
-					if provider.queries == 2 && stage == "omission refusal" {
-						metadata = must(functions.NewFunctionMetadata(metadata.Signature(), metadata.DisplayName(), foundation.Optional[functions.BuiltInFunctionName]{}, foundation.Optional[foundation.OperatorType]{}, metadata.NullPolicies()))
-					}
-					return metadata, err
+			// Deliberately vary inspection responses after valid construction to
+			// isolate omission handling; this is not a conforming stable provider.
+			provider.metadata = func(handle functioninterfaces.FunctionHandle) (*functions.FunctionMetadata, error) {
+				if stage == "extraction" || provider.queries == 2 && stage == "omission error" {
+					return nil, sentinel
 				}
+				metadata, err := provider.FunctionContext.Metadata(handle)
+				if provider.queries == 2 && stage == "omission refusal" {
+					metadata = must(functions.NewFunctionMetadata(metadata.Signature(), metadata.DisplayName(), foundation.Optional[functions.BuiltInFunctionName]{}, foundation.Optional[foundation.OperatorType]{}, metadata.NullPolicies()))
+				}
+				return metadata, err
 			}
 			result, err := a.ProveLiteral(target, engine.RewriteContext{Attempt: a, Path: engine.OccurrencePath{1, 0}})
 			if _, present := result.Get(); present {

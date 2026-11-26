@@ -26,10 +26,10 @@ type RewriteStep struct {
 // RewriteResult pairs a tentative expression with the evidence for retained changes.
 // Rejected changes return the original expression without their tentative steps.
 type RewriteResult struct {
-	// construction binds a complete traversal result to its owner and retained evidence.
-	construction *completedRewrite
-	Expression   expressions.Expression // Tentative subtree; publication requires later whole-region acceptance.
-	Steps        []RewriteStep          // Owned evidence, including independent copies of each source path.
+	// owner is set only by a completed Rewrite; tentative results cannot be accepted.
+	owner      *RewriteAttempt
+	expression expressions.Expression // Tentative subtree; publication requires later whole-region acceptance.
+	steps      []RewriteStep          // Owned evidence, including independent copies of each source path.
 }
 
 // NewRewriteResult copies the step slice and its paths, sharing immutable data.
@@ -37,12 +37,7 @@ type RewriteResult struct {
 // preserves child evidence; it does not by itself introduce a local proof step.
 func NewRewriteResult(expression expressions.Expression, steps []RewriteStep) RewriteResult {
 	assertions.NotNil(expression)
-	owned := make([]RewriteStep, len(steps))
-	for i, step := range steps {
-		owned[i] = step
-		owned[i].Path = step.Path.Clone()
-	}
-	return RewriteResult{Expression: expression, Steps: owned}
+	return RewriteResult{expression: expression, steps: copySteps(steps)}
 }
 
 // NewStep checks source, Type and evidence associations for a local derivation.
@@ -60,7 +55,7 @@ func (a *RewriteAttempt) NewStep(context RewriteContext, source, before, after e
 	if assertions.IsNil(source) || assertions.IsNil(before) || assertions.IsNil(after) {
 		return invalid("missing expression")
 	}
-	original, err := context.Path.Resolve(a.Source)
+	original, err := context.Path.Resolve(a.source)
 	if err != nil {
 		return RewriteStep{}, err
 	}
@@ -69,7 +64,7 @@ func (a *RewriteAttempt) NewStep(context RewriteContext, source, before, after e
 	}
 	// Neither the frozen guard subtree nor its protected AND ancestors may
 	// acquire a substitution/cleanup step. Ancestors may still rebuild children.
-	if a.Guard.Path.IsPrefixOf(context.Path) || context.Path.IsPrefixOf(a.Guard.Path) {
+	if a.guard.Path.IsPrefixOf(context.Path) || context.Path.IsPrefixOf(a.guard.Path) {
 		return invalid("step changes the protected guard path or subtree")
 	}
 	if !source.Type().EqualsTo(before.Type()) || !before.Type().EqualsTo(after.Type()) {
@@ -85,14 +80,14 @@ func (a *RewriteAttempt) NewStep(context RewriteContext, source, before, after e
 		if proof.Summary().Source() != source {
 			return invalid("conclusion describes a different source")
 		}
-		if proof.InputDomain() != a.Input || !proof.Scope().EqualsTo(a.Scope) {
+		if proof.InputDomain() != a.input || !proof.Scope().EqualsTo(a.scope) {
 			return invalid("conclusion uses a foreign scope or input domain")
 		}
-		if !proof.Summary().Operand().EqualsTo(a.Input.Operand()) {
+		if !proof.Summary().Operand().EqualsTo(a.input.Operand()) {
 			return invalid("conclusion describes a different operand")
 		}
 		premises := proof.Premises()
-		if len(premises) != 1 || !premises[0].EqualsTo(a.Premise) || !premises[0].Scope().EqualsTo(a.Scope) {
+		if len(premises) != 1 || !premises[0].EqualsTo(a.premise) || !premises[0].Scope().EqualsTo(a.scope) {
 			return invalid("conclusion does not depend on this attempt's guard premise")
 		}
 		truth, present := proof.Truth().Get()
@@ -100,7 +95,7 @@ func (a *RewriteAttempt) NewStep(context RewriteContext, source, before, after e
 		if !present || !ok {
 			return invalid("missing Boolean truth")
 		}
-		expected, err := boolean_cleanup.TruthLiteral(a.Rule.factory, boolean, truth)
+		expected, err := boolean_cleanup.TruthLiteral(a.rule.factory, boolean, truth)
 		if err != nil {
 			return RewriteStep{}, err
 		}
@@ -129,9 +124,18 @@ func (a *RewriteAttempt) NewStep(context RewriteContext, source, before, after e
 	return RewriteStep{Path: context.Path.Clone(), Source: source, Before: before, After: after, Conclusion: conclusion}, nil
 }
 
-// completedRewrite is produced only after Rewrite finishes successfully. The
-// snapshot owns its evidence slices; it is never used to reuse a previous result.
-type completedRewrite struct {
-	owner    *RewriteAttempt
-	snapshot RewriteResult
+// Returns the immutable tentative expression.
+func (r RewriteResult) Expression() expressions.Expression { return r.expression }
+
+// Copies evidence and paths, sharing only immutable expression and conclusion data.
+func (r RewriteResult) Steps() []RewriteStep { return copySteps(r.steps) }
+
+// Copies mutable evidence containers while sharing immutable proof data.
+func copySteps(steps []RewriteStep) []RewriteStep {
+	owned := make([]RewriteStep, len(steps))
+	for i, step := range steps {
+		owned[i] = step
+		owned[i].Path = step.Path.Clone()
+	}
+	return owned
 }

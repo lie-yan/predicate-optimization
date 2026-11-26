@@ -69,7 +69,7 @@ func TestTreeTraversalAllVariantsAndSharing(t *testing.T) {
 	if got.Children()[0].Children()[1] != replacement || in.Children()[1] != leaf {
 		t.Fatal("replacement or immutability lost")
 	}
-	if err := utils.ValidateWithContext(got, provider); err != nil {
+	if err := utils.ValidateForOptimization(got); err != nil {
 		t.Fatal(err)
 	}
 }

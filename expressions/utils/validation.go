@@ -4,13 +4,10 @@ import (
 	"fmt"
 
 	"github.com/lie-yan/predicate-optimization/expressions"
+	"github.com/lie-yan/predicate-optimization/functions"
+	functionutils "github.com/lie-yan/predicate-optimization/functions/utils"
 	"github.com/lie-yan/predicate-optimization/internal/assertions"
 	"github.com/lie-yan/predicate-optimization/types"
-
-	functioninterfaces "github.com/lie-yan/predicate-optimization/functions/interfaces"
-	functionutils "github.com/lie-yan/predicate-optimization/functions/utils"
-
-	"github.com/lie-yan/predicate-optimization/functions"
 )
 
 // Validate checks an entire immutable graph, including binding consistency.
@@ -29,25 +26,11 @@ func ValidateForOptimization(root expressions.Expression) error {
 	return (&graphValidator{states: make(map[expressions.Expression]uint8), useCallContexts: true}).visit(root)
 }
 
-// ValidateWithContext additionally checks every call using the supplied context.
-// This compatibility API is for graphs whose handles share that provider domain;
-// use ValidateForOptimization to inspect each call's retained context instead.
-// It queries metadata only; validity does not imply evaluation availability.
-// A nil context violates the precondition and panics.
-func ValidateWithContext(root expressions.Expression, context functioninterfaces.FunctionContext) error {
-	if assertions.IsNil(context) {
-		panic("expressions/utils: expected non-nil context")
-	}
-	return (&graphValidator{states: make(map[expressions.Expression]uint8), context: context}).visit(root)
-}
-
 type graphValidator struct {
 	// states tracks unseen (0), visiting (1) and completed (2) nodes to detect cycles and visit shared nodes once.
 	states map[expressions.Expression]uint8
-	// useCallContexts selects each call's retained context for metadata inspection instead of the supplied context.
+	// useCallContexts enables metadata inspection using each call's retained context.
 	useCallContexts bool
-	// context supplies the legacy shared provider; nil with useCallContexts false selects structural validation only.
-	context functioninterfaces.FunctionContext
 	// references records each canonical column key's full declared Type to reject conflicting declarations.
 	references map[string]types.Type
 	// opaques records each canonical opaque-region key's full declared Type independently of column identities.
@@ -141,19 +124,10 @@ func (v *graphValidator) local(node expressions.Expression) error {
 				return fmt.Errorf("call signature argument %d type mismatch", i)
 			}
 		}
-		if v.useCallContexts || v.context != nil {
-			var metadata *functions.FunctionMetadata
-			var err error
-			if v.useCallContexts {
-				metadata, err = functionutils.InspectFunction(e.Context(), e.Handle())
-			} else {
-				metadata, err = v.context.Metadata(e.Handle())
-			}
+		if v.useCallContexts {
+			metadata, err := functionutils.InspectFunction(e.Context(), e.Handle())
 			if err != nil {
 				return fmt.Errorf("call metadata: %w", err)
-			}
-			if metadata == nil {
-				return fmt.Errorf("missing function metadata")
 			}
 			if err := functions.ValidateCallSignature(metadata, e.Signature()); err != nil {
 				return fmt.Errorf("call signature: %w", err)

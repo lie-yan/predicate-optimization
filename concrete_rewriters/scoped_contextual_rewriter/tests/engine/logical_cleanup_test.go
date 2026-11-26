@@ -149,17 +149,17 @@ func TestCleanupLogicalChangedChildrenAndEvidence(t *testing.T) {
 	if !present {
 		t.Fatal("expected scoped proof")
 	}
-	original := must((engine.OccurrencePath{1}).Resolve(a.Source)).(*expressions.LogicalExpression)
-	children := []expressions.Expression{proven.Expression}
+	original := must((engine.OccurrencePath{1}).Resolve(a.Source())).(*expressions.LogicalExpression)
+	children := []expressions.Expression{proven.Expression()}
 	candidate, present := must(cleaner.CleanupLogical(original, children)).Get()
 	if !present || !candidate.EqualsTo(cleanupLiteral(foundation.True, foundation.NonNull)) {
 		t.Fatal("NOT False cleanup missing")
 	}
 	rebuilt := must(original.WithChildren(children))
 	step := must(a.NewStep(engine.RewriteContext{Attempt: a, Path: engine.OccurrencePath{1}}, original, rebuilt, candidate, foundation.Optional[scoped_reasoning.ScopedConclusion]{}))
-	result := engine.NewRewriteResult(candidate, append(proven.Steps, step))
-	proof, ok := result.Steps[0].Conclusion.Get()
-	if len(result.Steps) != 2 || !ok || !proof.Premises()[0].EqualsTo(a.Premise) {
+	result := engine.NewRewriteResult(candidate, append(proven.Steps(), step))
+	proof, ok := result.Steps()[0].Conclusion.Get()
+	if len(result.Steps()) != 2 || !ok || !proof.Premises()[0].EqualsTo(a.Premise()) {
 		t.Fatal("cleanup dropped earlier dependency")
 	}
 	// A refused cleanup still permits rebuilding with already-justified children.

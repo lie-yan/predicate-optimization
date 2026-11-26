@@ -230,7 +230,7 @@ A successful result contains a literal with the original target's exact Type and
 `ProveLiteral` uses this check before extraction:
 
 ```go
-if a.Guard.Path.IsPrefixOf(context.Path) || context.Path.IsPrefixOf(a.Guard.Path) {
+if a.guard.Path.IsPrefixOf(context.Path) || context.Path.IsPrefixOf(a.guard.Path) {
     return absent, nil
 }
 ```
@@ -440,7 +440,7 @@ NOT False -> True        fixed cleanup
 
 Acceptance receives the entire `G AND True`, together with all three steps. The first dependency remains relevant even though `x == 3` has disappeared. If A is nullable, the constant and complete region retain their original nullable Types.
 
-Two private records connect that evidence to construction. `NewAttempt` retains its original source, guard path, scope, premise and derived input associations. `Rewrite` validates these associations, completes traversal and rollback, then records its exact candidate and an owned copy of its evidence. These records preserve provenance; they do not reuse prior computations. Subtree `Visit` results and manually assembled `NewRewriteResult` values do not carry completed construction evidence.
+Attempt and result state is private. `NewAttempt` retains one set of source, guard, scope, premise and derived input associations; accessors share immutable objects and copy mutable paths. Each step's source, Type and proof dependencies are checked during construction. After traversal and rollback finish, `Rewrite` marks the result with its completing attempt's identity. Subtree `Visit` results and manually assembled `NewRewriteResult` values have no completed owner and cannot be accepted. `Steps()` returns copies of the evidence slice and paths, so callers cannot alter completed evidence. No duplicate attempt or result snapshot is retained.
 
 ```mermaid
 flowchart LR
@@ -465,12 +465,12 @@ flowchart LR
 | Original completed `G AND True`, with retained dependency chain | Accept if the complete region improves. |
 | Completed unchanged source | Absence; preserve the source. |
 | Guard moved, replaced by an equal copy, or placed below OR | Contract error. |
-| A narrower InputDomain substituted after construction | Contract error, even with the same premise token. |
-| Proof steps dropped, reordered or borrowed from another attempt | Contract error. |
+| Attempt inputs or completed evidence altered through an accessor | Accessors expose no mutable internal state. |
+| Manually assembled evidence or a completed result borrowed from another attempt | Contract error: missing or foreign completed owner. |
 | Equal or enlarged candidate assembled outside the recorded traversal | Contract error: equivalence alone supplies no construction evidence. |
 | Combining two attempts to delete each other's guard | Contract error: neither premise remains justified. |
 
-Acceptance repeats no scalar extraction, set reasoning, provider queries or evaluation. It checks local steps with the existing source/Type/dependency rules and trusts only the eligibility and rebuilding decisions bound to the completed traversal. It then applies `Improves`. The current traversal never grows a valid candidate; separate policy tests cover the larger-measure rejection policy. No partly rebuilt result escapes on an error.
+Acceptance repeats no scalar extraction, set reasoning, provider queries or evaluation. It checks attempt associations, result Type, retained guard and completing owner; local step validation has already occurred during the encapsulated traversal. It then applies `Improves`. The current traversal never grows a valid candidate; separate policy tests cover the larger-measure rejection policy. No partly rebuilt result escapes on an error.
 
 ## Public traversal and fallback
 

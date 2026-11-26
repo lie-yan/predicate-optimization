@@ -90,7 +90,7 @@ type GuardCandidate struct {
 // in stored source order. Unsupported candidates are skipped; encountered errors
 // abort selection. Actual restriction usefulness is decided by later attempts.
 func (r *Engine) SelectGuards(source *expressions.LogicalExpression) ([]GuardCandidate, error) {
-	if r == nil || r.Extractor == nil {
+	if r == nil || r.extractor == nil {
 		panic("scoped_contextual_rewriter: expected constructed ScopedContextualRewriter")
 	}
 	assertions.NotNilPointer(source)
@@ -113,7 +113,7 @@ func (r *Engine) SelectGuards(source *expressions.LogicalExpression) ([]GuardCan
 		}
 		// Summarize the complete conjunct, including an OR or NOT subtree;
 		// an exact inner predicate alone does not establish the whole guard.
-		result, err := r.Extractor.Extract(conjunct.Expression)
+		result, err := r.extractor.Extract(conjunct.Expression)
 		if err != nil {
 			// Preserve operational failures and discard any partial candidate list.
 			return nil, fmt.Errorf("guard at %v: %w", conjunct.Path, err)

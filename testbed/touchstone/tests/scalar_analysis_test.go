@@ -71,14 +71,14 @@ func touchstoneSummary(t *testing.T, f *fixture.Touchstone, source expressions.E
 // The API supplies conditional evidence, without changing either fixture tree.
 func touchstoneGuardDomain(t *testing.T, f *fixture.Touchstone, guard expressions.Expression) (*scoped_reasoning.InputDomain, *scoped_reasoning.InputDomain, *scoped_reasoning.Premise) {
 	t.Helper()
-	context := scoped_reasoning.NewScopedFactContext()
-	scope := context.NewScope()
+
+	scope := scoped_reasoning.NewScope()
 	article := f.Columns.ArticleType
 	all := touchstoneMust(finite.NewExcludedEquatableValueSet(testbedvalues.ValueFactory{}, article.Type(), nil))
 	base := touchstoneMust(scoped_reasoning.NewInputDomain(scope, article, all, article.Type().Nullability() == foundation.MayNull, nil))
-	premise := touchstoneMust(context.RegisterPremise(scope, guard))
-	conclusion, present := touchstoneMust(scoped_reasoning.RestrictToTrue(touchstoneSummary(t, f, guard), base, premise)).Get()
-	if !present || conclusion.Kind() != scoped_reasoning.RestrictedDomain {
+	premise := touchstoneMust(scope.RegisterPremise(guard))
+	conclusion := touchstoneMust(scoped_reasoning.RestrictToTrue(touchstoneSummary(t, f, guard), base, premise))
+	if conclusion.Kind() != scoped_reasoning.RestrictedDomain {
 		t.Fatal("guard restriction missing")
 	}
 	domain, present := conclusion.RestrictedDomain().Get()

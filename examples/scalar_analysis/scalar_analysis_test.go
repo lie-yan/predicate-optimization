@@ -76,7 +76,7 @@ func Example_scalarNullableContradiction() {
 	evaluator := interpreter.NewExpressionInterpreterWithFunctionContext(testbedvalues.ValueFactory{}, context)
 	result := fixtures.Must(evaluator.Evaluate(source, fixtures.Environment{{ID: x.ID(), Value: fixtures.Must(testbedvalues.NewNull(integer))}}))
 	fmt.Println("evaluation at NULL is NULL:", result.IsNull())
-	scope := scoped_reasoning.NewScopedFactContext().NewScope()
+	scope := scoped_reasoning.NewScope()
 	nullOnly := fixtures.Must(scoped_reasoning.NewInputDomain(scope, x, summary.TrueSet(), true, nil))
 	proof, hasProof := fixtures.Must(scoped_reasoning.ProveTruth(summary, nullOnly)).Get()
 	truth, hasTruth := proof.Truth().Get()
@@ -137,8 +137,8 @@ func Example_scalarRangeGuard() {
 	guard := fixtures.ScalarLogical(foundation.And, fixtures.ScalarComparison(context, foundation.GreaterThanOrEqual, x, number(0)), fixtures.ScalarComparison(context, foundation.LessThan, x, number(10)))
 	target := fixtures.ScalarComparison(context, foundation.LessThan, x, number(20))
 	guardSummary, targetSummary := fixtures.ScalarSummary(context, guard), fixtures.ScalarSummary(context, target)
-	factsContext := scoped_reasoning.NewScopedFactContext()
-	scope := factsContext.NewScope()
+
+	scope := scoped_reasoning.NewScope()
 	universe := fixtures.Must(finite.NewExcludedEquatableValueSet(testbedvalues.ValueFactory{}, integer, nil))
 	input := fixtures.Must(scoped_reasoning.NewInputDomain(scope, x, universe, true, nil))
 	_, globallyKnown := fixtures.Must(scoped_reasoning.ProveTruth(targetSummary, input)).Get()
@@ -146,11 +146,8 @@ func Example_scalarRangeGuard() {
 
 	// Registration records an occurrence; restriction establishes its true-input
 	// domain conditionally, retaining that occurrence as a dependency.
-	premise := fixtures.Must(factsContext.RegisterPremise(scope, guard))
-	restriction, hasRestriction := fixtures.Must(scoped_reasoning.RestrictToTrue(guardSummary, input, premise)).Get()
-	if !hasRestriction {
-		panic("expected restriction")
-	}
+	premise := fixtures.Must(scope.RegisterPremise(guard))
+	restriction := fixtures.Must(scoped_reasoning.RestrictToTrue(guardSummary, input, premise))
 	restricted, hasDomain := restriction.RestrictedDomain().Get()
 	if !hasDomain {
 		panic("expected reachable restricted domain")

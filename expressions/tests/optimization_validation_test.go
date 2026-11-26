@@ -51,9 +51,6 @@ func TestValidateForOptimizationUsesEachCallContext(t *testing.T) {
 	if leftContext.queries != 1 || rightContext.queries != 1 || expressions.PrettyPrint(root) != before {
 		t.Fatal("shared calls should be inspected once without mutation")
 	}
-	if err := utils.ValidateWithContext(root, first); !errors.Is(err, functions.ErrIncompatibleHandle) {
-		t.Fatalf("single-context compatibility behavior changed: %v", err)
-	}
 	// A provider deliberately loses the pairing after valid construction. Entry
 	// validation must diagnose it rather than borrow the other call's context.
 	rightContext.delegate = first

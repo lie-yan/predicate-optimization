@@ -1,7 +1,6 @@
 package expressions_test
 
 import (
-	"errors"
 	"testing"
 
 	functioninterfaces "github.com/lie-yan/predicate-optimization/functions/interfaces"
@@ -40,13 +39,14 @@ func TestValidateSharedGraphAndContext(t *testing.T) {
 	var left expressions.Expression = value
 	var right expressions.Expression = fixture(expressions.NewLiteralExpression(fixture(testbedvalues.NewInteger(integer, 8))))
 	for i := 0; i < 40; i++ {
-		left = fixture(expressions.NewCallExpression(provider, handle, []expressions.Expression{left, left}))
-		right = fixture(expressions.NewCallExpression(provider, handle, []expressions.Expression{right, right}))
+		left = fixture(expressions.NewCallExpression(ctx, handle, []expressions.Expression{left, left}))
+		right = fixture(expressions.NewCallExpression(ctx, handle, []expressions.Expression{right, right}))
 	}
 	if err := utils.Validate(left); err != nil {
 		t.Fatal(err)
 	}
-	if err := utils.ValidateWithContext(left, ctx); err != nil {
+	ctx.queries = 0
+	if err := utils.ValidateForOptimization(left); err != nil {
 		t.Fatal(err)
 	}
 	if ctx.queries != 40 {
@@ -54,10 +54,6 @@ func TestValidateSharedGraphAndContext(t *testing.T) {
 	}
 	if !left.EqualsTo(right) || !right.EqualsTo(left) {
 		t.Fatal("equal shared DAGs differ")
-	}
-	foreign := fixture(testbed.NewStandardContext())
-	if err := utils.ValidateWithContext(left, foreign); !errors.Is(err, functions.ErrIncompatibleHandle) {
-		t.Fatalf("expected incompatible context, got %v", err)
 	}
 }
 
@@ -99,32 +95,5 @@ func TestValidateMembershipAndOrderedEquality(t *testing.T) {
 	var nilRoot *expressions.LiteralExpression
 	if utils.Validate(nilRoot) == nil {
 		t.Fatal("typed nil root accepted")
-	}
-}
-
-type changedMetadataContext struct {
-	functioninterfaces.FunctionContext
-	metadata *functions.FunctionMetadata
-}
-
-func (c changedMetadataContext) Metadata(functioninterfaces.FunctionHandle) (*functions.FunctionMetadata, error) {
-	return c.metadata, nil
-}
-
-func TestValidateContextRejectsChangedResultType(t *testing.T) {
-	provider := fixture(testbed.NewStandardContext())
-	integer := fixture(types.NewIntType(types.Int64, foundation.NonNull))
-	nullable := fixture(integer.WithNullability(foundation.MayNull))
-	literal := fixture(expressions.NewLiteralExpression(fixture(testbedvalues.NewInteger(integer, 1))))
-	handle := fixture(provider.ArithmeticFunction(foundation.Add, []types.Type{integer, integer}))
-	call := fixture(expressions.NewCallExpression(provider, handle, []expressions.Expression{literal, literal}))
-	signature := fixture(functions.NewFunctionSignature([]types.Type{integer, integer}, nullable))
-	metadata := fixture(functions.NewFunctionMetadata(signature, "", foundation.Optional[functions.BuiltInFunctionName]{}, foundation.Optional[foundation.OperatorType]{}, []functions.NullPolicy{functions.PropagateNull, functions.PropagateNull}))
-	ctx := changedMetadataContext{FunctionContext: provider, metadata: metadata}
-	if err := utils.Validate(call); err != nil {
-		t.Fatal(err)
-	}
-	if err := utils.ValidateWithContext(call, ctx); err == nil {
-		t.Fatal("changed effective result type accepted")
 	}
 }

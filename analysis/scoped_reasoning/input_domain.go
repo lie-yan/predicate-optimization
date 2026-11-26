@@ -47,7 +47,7 @@ func NewInputDomain(scope *Scope, operand *expressions.ReferenceExpression, poss
 	for _, premise := range premises {
 		premise.assertConstructed()
 		if !scope.EqualsTo(premise.Scope()) {
-			return nil, fmt.Errorf("scoped_reasoning: premise belongs to another scope or context")
+			return nil, fmt.Errorf("scoped_reasoning: premise belongs to another scope")
 		}
 		if _, exists := seen[premise.identity]; !exists {
 			seen[premise.identity] = struct{}{}

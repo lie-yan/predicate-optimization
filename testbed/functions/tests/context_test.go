@@ -66,9 +66,9 @@ func TestContextInspection(t *testing.T) {
 
 type foreignHandle struct{}
 
-func (foreignHandle) Namespace() string           { return "fixture" }
-func (foreignHandle) Name() string                { return "identity" }
-func (foreignHandle) ArgumentTypes() []types.Type { return nil }
+func (foreignHandle) Namespace() string                       { return "fixture" }
+func (foreignHandle) Name() string                            { return "identity" }
+func (foreignHandle) Signature() *shared.FunctionSignature { return nil }
 func (foreignHandle) EqualsTo(other functioninterfaces.FunctionHandle) bool {
 	_, ok := other.(foreignHandle)
 	return ok

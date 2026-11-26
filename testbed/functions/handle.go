@@ -4,7 +4,7 @@ import (
 	functioninterfaces "github.com/lie-yan/predicate-optimization/functions/interfaces"
 	"github.com/lie-yan/predicate-optimization/internal/assertions"
 
-	"github.com/lie-yan/predicate-optimization/types"
+	"github.com/lie-yan/predicate-optimization/functions"
 )
 
 // Handle identifies a canonical entry within its catalog. It is immutable and
@@ -27,10 +27,10 @@ func (h *Handle) Name() string {
 	return h.entry.name
 }
 
-// ArgumentTypes returns a copied slice sharing immutable Type descriptors.
-func (h *Handle) ArgumentTypes() []types.Type {
+// Shares the catalog's immutable implementation signature.
+func (h *Handle) Signature() *functions.FunctionSignature {
 	h.assertValid()
-	return h.entry.metadata.Signature().ArgumentTypes()
+	return h.entry.metadata.Signature()
 }
 
 // EqualsTo compares catalog and canonical entry identity, not handle addresses.

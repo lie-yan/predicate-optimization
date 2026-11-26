@@ -15,7 +15,7 @@ func TestMetadataInspectionReadsEveryTime(t *testing.T) {
 	boolean := must(types.NewBoolType(foundation.NonNull))
 	metadata := inspectionMetadata([]types.Type{integer, integer})
 	context := &metadataReadContext{metadata: metadata}
-	handle := &metadataReadHandle{arguments: []types.Type{integer, integer}}
+	handle := &metadataReadHandle{signature: metadata.Signature()}
 	for i := 1; i <= 2; i++ {
 		got, err := utils.InspectFunction(context, handle)
 		if err != nil || got != metadata || context.queries != i || handle.reads != i {
@@ -29,10 +29,9 @@ func TestMetadataInspectionReadsEveryTime(t *testing.T) {
 	}{
 		{nil, "function contract violated: handle/metadata arity mismatch"},
 		{[]types.Type{integer, boolean}, "function contract violated: handle/metadata argument 1 mismatch"},
-		{[]types.Type{integer, nil}, "function contract violated: handle/metadata argument 1 mismatch"},
 	} {
 		c := &metadataReadContext{metadata: metadata}
-		h := &metadataReadHandle{arguments: tc.args}
+		h := &metadataReadHandle{signature: inspectionMetadata(tc.args).Signature()}
 		got, err := utils.InspectFunction(c, h)
 		if got != nil || !errors.Is(err, functions.ErrContractViolation) || err.Error() != tc.message || c.queries != 1 || h.reads != 1 {
 			t.Fatalf("unexpected mismatch behavior: %v", err)

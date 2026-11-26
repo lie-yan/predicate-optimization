@@ -24,9 +24,9 @@ func (h *observedHandle) EqualsTo(other functioninterfaces.FunctionHandle) bool 
 	return ok && h == o
 }
 
-func (h *observedHandle) ArgumentTypes() []types.Type {
+func (h *observedHandle) Signature() *functions.FunctionSignature {
 	h.argumentQueries++
-	return h.FunctionHandle.ArgumentTypes()
+	return h.FunctionHandle.Signature()
 }
 
 func TestStoredComparisonTrustsValidatedBinding(t *testing.T) {
